@@ -5,12 +5,13 @@ import {
   ArrowRightLeft,
   Search,
   Plus,
-  Trash2,
   Calendar,
   AlertCircle,
   CheckCircle2,
   XCircle,
   FileText,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import { formatRial } from '@/lib/formatters';
 import TransactionModal from '@/components/TransactionModal';
@@ -21,7 +22,9 @@ export default function TransactionsPage() {
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<any | null>(null);
   const [todayJalali, setTodayJalali] = useState('');
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -36,7 +39,7 @@ export default function TransactionsPage() {
 
       if (resJ.ok) {
         const jData = await resJ.json();
-        setJournals(jData.reverse()); // جدیدترین بالا
+        setJournals(jData.reverse()); // جدیدترین اول
       }
       if (resA.ok) {
         const aData = await resA.json();
@@ -59,6 +62,25 @@ export default function TransactionsPage() {
     window.addEventListener('refresh-financial-data', onRefresh);
     return () => window.removeEventListener('refresh-financial-data', onRefresh);
   }, []);
+
+  const handleEdit = (journal: any) => {
+    const srcLine = journal.lines.find((l: any) => l.lineRole === 'SOURCE');
+    const dstLine = journal.lines.find((l: any) => l.lineRole === 'DESTINATION');
+    const feeLine = journal.lines.find((l: any) => l.lineRole === 'FEE');
+
+    setEditingTx({
+      id: journal.id,
+      serialNo: journal.serialNo,
+      sourceAccountId: srcLine?.accountId,
+      destinationAccountId: dstLine?.accountId,
+      amount: dstLine ? dstLine.amount : journal.totalDebit,
+      fee: feeLine ? feeLine.amount : '0',
+      formattedJalali: journal.formattedJalali,
+      description: journal.description || '',
+      refNo: journal.refNo || '',
+    });
+    setIsModalOpen(true);
+  };
 
   const handleVoid = async (id: string, serialNo: string) => {
     const reason = prompt(`دلیل ابطال سند شماره ${serialNo} را وارد کنید:`, 'اشتباه در ثبت');
@@ -100,13 +122,16 @@ export default function TransactionsPage() {
       {/* سربرگ */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">تراکنش‌ها و گردش‌ها</h1>
+          <h1 className="text-lg font-bold text-slate-800">تراکنش‌ها و گردش‌های مالی</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            فهرست اسناد ثبت‌شده و امکان ثبت تراکنش جدید یا ابطال اصولی (سند اصلاحی)
+            فهرست اسناد ثبتی، ویرایش مبالغ و حساب‌ها، تقویم شمسی تعاملی، و ابطال با سند متقابل
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingTx(null);
+            setIsModalOpen(true);
+          }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-500/20 transition cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -228,13 +253,23 @@ export default function TransactionsPage() {
                       </td>
                       <td className="py-3 px-4 text-center">
                         {!isVoid && (
-                          <button
-                            onClick={() => handleVoid(j.id, j.serialNo)}
-                            className="text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition font-medium cursor-pointer"
-                            title="ابطال سند"
-                          >
-                            ابطال
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleEdit(j)}
+                              className="text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition font-medium flex items-center gap-1 cursor-pointer"
+                              title="ویرایش تراکنش"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span>ویرایش</span>
+                            </button>
+                            <button
+                              onClick={() => handleVoid(j.id, j.serialNo)}
+                              className="text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded-lg transition font-medium cursor-pointer"
+                              title="ابطال سند"
+                            >
+                              ابطال
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -248,13 +283,17 @@ export default function TransactionsPage() {
 
       <TransactionModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTx(null);
+        }}
         onSuccess={() => {
           loadData();
           window.dispatchEvent(new Event('refresh-financial-data'));
         }}
         accounts={accounts}
         todayJalali={todayJalali}
+        editData={editingTx}
       />
     </div>
   );

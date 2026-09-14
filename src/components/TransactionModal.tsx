@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRightLeft, TrendingDown, TrendingUp, DollarSign, Calendar, FileText, Hash } from 'lucide-react';
+import { X, ArrowRightLeft, TrendingDown, TrendingUp, DollarSign, FileText, Hash, Sparkles } from 'lucide-react';
 import { formatRial } from '@/lib/formatters';
-
 import { AccountOption } from '@/types';
+import ShamsiDatePicker from '@/components/ShamsiDatePicker';
 
 export default function TransactionModal({
   isOpen,
@@ -12,12 +12,14 @@ export default function TransactionModal({
   onSuccess,
   accounts,
   todayJalali,
+  editData,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   accounts: AccountOption[];
   todayJalali?: string;
+  editData?: any | null;
 }) {
   const [type, setType] = useState<'EXPENSE' | 'INCOME' | 'TRANSFER'>('EXPENSE');
   const [sourceId, setSourceId] = useState('');
@@ -30,30 +32,38 @@ export default function TransactionModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (todayJalali) setShamsiDate(todayJalali);
-  }, [todayJalali]);
+  const isEditMode = !!editData;
 
-  // تنظیم هوشمند گزینه‌های مبدأ و مقصد بر اساس نوع
   useEffect(() => {
-    const postable = accounts.filter((a) => a.isPostable);
-    const cashAndBank = postable.filter((a) => a.accountKind === 'CASH' || a.accountKind === 'BANK');
-    const expenses = postable.filter((a) => a.accountClass === 'EXPENSE');
-    const incomes = postable.filter((a) => a.accountClass === 'INCOME');
-
-    if (type === 'EXPENSE') {
-      if (cashAndBank.length > 0) setSourceId(cashAndBank[0].id);
-      if (expenses.length > 0) setDestId(expenses[0].id);
-    } else if (type === 'INCOME') {
-      if (incomes.length > 0) setSourceId(incomes[0].id);
-      if (cashAndBank.length > 0) setDestId(cashAndBank[0].id);
+    if (editData) {
+      setSourceId(editData.sourceAccountId || '');
+      setDestId(editData.destinationAccountId || '');
+      setAmount(editData.amount ? Number(editData.amount).toLocaleString('en-US') : '');
+      setFee(editData.fee && editData.fee !== '0' ? Number(editData.fee).toLocaleString('en-US') : '');
+      setShamsiDate(editData.formattedJalali || todayJalali || '1405/06/23');
+      setDescription(editData.description || '');
+      setRefNo(editData.refNo || '');
     } else {
-      // TRANSFER
-      if (cashAndBank.length > 0) setSourceId(cashAndBank[0].id);
-      if (cashAndBank.length > 1) setDestId(cashAndBank[1].id);
-      else if (postable.length > 0) setDestId(postable[0].id);
+      if (todayJalali) setShamsiDate(todayJalali);
+      // انتخاب پیش‌فرض هوشمند
+      const postable = accounts.filter((a) => a.isPostable);
+      const cashAndBank = postable.filter((a) => a.accountKind === 'CASH' || a.accountKind === 'BANK');
+      const expenses = postable.filter((a) => a.accountClass === 'EXPENSE');
+      const incomes = postable.filter((a) => a.accountClass === 'INCOME');
+
+      if (type === 'EXPENSE') {
+        if (cashAndBank.length > 0) setSourceId(cashAndBank[0].id);
+        if (expenses.length > 0) setDestId(expenses[0].id);
+      } else if (type === 'INCOME') {
+        if (incomes.length > 0) setSourceId(incomes[0].id);
+        if (cashAndBank.length > 0) setDestId(cashAndBank[0].id);
+      } else {
+        if (cashAndBank.length > 0) setSourceId(cashAndBank[0].id);
+        if (cashAndBank.length > 1) setDestId(cashAndBank[1].id);
+        else if (postable.length > 0) setDestId(postable[0].id);
+      }
     }
-  }, [type, accounts]);
+  }, [editData, type, accounts, todayJalali, isOpen]);
 
   if (!isOpen) return null;
 
@@ -78,8 +88,11 @@ export default function TransactionModal({
     setLoading(true);
     try {
       const cleanFee = fee ? fee.replace(/,/g, '').replace(/٬/g, '').trim() : '0';
-      const res = await fetch('/api/transactions', {
-        method: 'POST',
+      const endpoint = isEditMode ? `/api/transactions/${editData.id}` : '/api/transactions';
+      const method = isEditMode ? 'PUT' : 'POST';
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourceAccountId: sourceId,
@@ -97,7 +110,6 @@ export default function TransactionModal({
         throw new Error(data.error || 'خطا در ثبت تراکنش');
       }
 
-      // بازنشانی فرم و موفقیت
       setAmount('');
       setFee('');
       setDescription('');
@@ -117,48 +129,52 @@ export default function TransactionModal({
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
         {/* سربرگ */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-bold text-slate-800 text-base">ثبت تراکنش جدید</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+          <h2 className="font-bold text-slate-800 text-sm">
+            {isEditMode ? `ویرایش تراکنش (سند شماره ${editData.serialNo})` : 'ثبت تراکنش جدید'}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* انتخاب نوع تراکنش */}
-        <div className="px-6 pt-4">
-          <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1.5 rounded-xl text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => setType('EXPENSE')}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
-                type === 'EXPENSE' ? 'bg-rose-500 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <TrendingDown className="w-4 h-4" />
-              <span>هزینه (پرداخت)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setType('INCOME')}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
-                type === 'INCOME' ? 'bg-emerald-600 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4" />
-              <span>درآمد (دریافت)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setType('TRANSFER')}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
-                type === 'TRANSFER' ? 'bg-blue-600 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-              <span>انتقال / کارت‌به‌کارت</span>
-            </button>
+        {/* انتخاب نوع تراکنش (در حالت ثبت جدید) */}
+        {!isEditMode && (
+          <div className="px-6 pt-4">
+            <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1.5 rounded-xl text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setType('EXPENSE')}
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
+                  type === 'EXPENSE' ? 'bg-rose-500 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <TrendingDown className="w-4 h-4" />
+                <span>هزینه (پرداخت)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setType('INCOME')}
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
+                  type === 'INCOME' ? 'bg-emerald-600 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>درآمد (دریافت)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setType('TRANSFER')}
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
+                  type === 'TRANSFER' ? 'bg-blue-600 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                <span>انتقال / کارت‌به‌کارت</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* بدنه فرم */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -181,7 +197,7 @@ export default function TransactionModal({
               >
                 {postableAccounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} ({a.code})
+                    {a.name} (کد: {a.code})
                   </option>
                 ))}
               </select>
@@ -198,19 +214,23 @@ export default function TransactionModal({
               >
                 {postableAccounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} ({a.code})
+                    {a.name} (کد: {a.code})
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* مبلغ و کارمزد */}
+          {/* مبلغ و کارمزد (یکدست و استاندارد) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5 flex items-center justify-between">
                 <span>مبلغ (ریال) *</span>
-                {amount && <span className="text-emerald-600 text-2xs font-semibold">{formatRial(amount.replace(/\D/g, ''))}</span>}
+                {amount && (
+                  <span className="text-emerald-600 text-2xs font-semibold font-mono">
+                    {formatRial(amount.replace(/\D/g, ''))}
+                  </span>
+                )}
               </label>
               <div className="relative">
                 <input
@@ -221,45 +241,48 @@ export default function TransactionModal({
                     setAmount(raw ? Number(raw).toLocaleString('en-US') : '');
                   }}
                   placeholder="مثال: ۵٬۰۰۰٬۰۰۰"
-                  className="w-full text-sm font-semibold tracking-wide bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full text-sm font-semibold tracking-wide bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-mono"
                   dir="ltr"
                   required
                 />
-                <DollarSign className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" />
+                <DollarSign className="w-4 h-4 text-slate-400 absolute right-2.5 top-3" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">کارمزد بانکی (اختیاری)</label>
-              <input
-                type="text"
-                value={fee}
-                onChange={(e) => {
-                  const raw = e.target.value.replace(/\D/g, '');
-                  setFee(raw ? Number(raw).toLocaleString('en-US') : '');
-                }}
-                placeholder="مثال: ۱۰٬۰۰۰"
-                className="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                dir="ltr"
-              />
-            </div>
-          </div>
-
-          {/* تاریخ شمسی و شماره پیگیری */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">تاریخ شمسی</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5 flex items-center justify-between">
+                <span>کارمزد بانکی</span>
+                {fee && (
+                  <span className="text-rose-500 text-2xs font-semibold font-mono">
+                    {formatRial(fee.replace(/\D/g, ''))}
+                  </span>
+                )}
+              </label>
               <div className="relative">
                 <input
                   type="text"
-                  value={shamsiDate}
-                  onChange={(e) => setShamsiDate(e.target.value)}
-                  placeholder="1405/06/23"
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  value={fee}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    setFee(raw ? Number(raw).toLocaleString('en-US') : '');
+                  }}
+                  placeholder="مثال: ۱۰٬۰۰۰"
+                  className="w-full text-sm font-semibold tracking-wide bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-mono"
                   dir="ltr"
                 />
-                <Calendar className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" />
+                <DollarSign className="w-4 h-4 text-slate-400 absolute right-2.5 top-3" />
               </div>
+            </div>
+          </div>
+
+          {/* تقویم انتخابی شمسی و شماره پیگیری */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <ShamsiDatePicker
+                value={shamsiDate}
+                onChange={(d) => setShamsiDate(d)}
+                label="تاریخ شمسی (انتخابی)"
+              />
             </div>
 
             <div>
@@ -270,7 +293,7 @@ export default function TransactionModal({
                   value={refNo}
                   onChange={(e) => setRefNo(e.target.value)}
                   placeholder="مثال: TR-123456"
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-mono"
                   dir="ltr"
                 />
                 <Hash className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" />
@@ -286,14 +309,14 @@ export default function TransactionModal({
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="توضیحات اختیاری درباره این تراکنش..."
+                placeholder="توضیحات درباره این تراکنش..."
                 className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               />
               <FileText className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" />
             </div>
           </div>
 
-          {/* دکمه‌های ثبت */}
+          {/* دکمه‌ها */}
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"
@@ -305,9 +328,9 @@ export default function TransactionModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 transition disabled:opacity-50 cursor-pointer"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 transition disabled:opacity-50 cursor-pointer"
             >
-              {loading ? 'در حال ثبت...' : 'ثبت سند و اعمال در مانده'}
+              {loading ? 'در حال ثبت...' : isEditMode ? 'ذخیره تغییرات سند' : 'ثبت سند و اعمال در مانده'}
             </button>
           </div>
         </form>

@@ -1,59 +1,49 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Wallet, Building2, User, TrendingDown, TrendingUp, Sparkles, DollarSign } from 'lucide-react';
-import { formatRial } from '@/lib/formatters';
-
-import { AccountOption } from '@/types';
+import { X, FolderPlus, HelpCircle, Edit3 } from 'lucide-react';
+import { AccountOption, AccountClass, AccountKind } from '@/types';
 
 export default function AccountModal({
   isOpen,
   onClose,
   onSuccess,
-  accounts,
+  accounts = [],
+  parentAccounts = [],
+  editData = null,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  accounts: AccountOption[];
+  accounts?: AccountOption[];
+  parentAccounts?: AccountOption[];
+  editData?: any | null;
 }) {
   const [name, setName] = useState('');
-  const [categoryType, setCategoryType] = useState<'BANK' | 'CASH' | 'PERSON' | 'EXPENSE' | 'INCOME'>('BANK');
-  const [initialBalance, setInitialBalance] = useState('');
-  const [isFavorite, setIsFavorite] = useState(true);
-  const [customCode, setCustomCode] = useState('');
-  const [autoCode, setAutoCode] = useState('');
+  const [accountClass, setAccountClass] = useState<AccountClass>('ASSET');
+  const [accountKind, setAccountKind] = useState<AccountKind>('BANK');
+  const [parentId, setParentId] = useState<string>('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // محاسبه خودکار کد پیشنهادی
+  const isEditMode = !!editData;
+
   useEffect(() => {
-    let parentPrefix = '10102'; // پیش‌فرض بانک
-    let classType = 'ASSET';
-
-    if (categoryType === 'CASH') {
-      parentPrefix = '10101';
-      classType = 'ASSET';
-    } else if (categoryType === 'PERSON') {
-      parentPrefix = '10201';
-      classType = 'ASSET';
-    } else if (categoryType === 'INCOME') {
-      parentPrefix = '40101';
-      classType = 'INCOME';
-    } else if (categoryType === 'EXPENSE') {
-      parentPrefix = '50101';
-      classType = 'EXPENSE';
+    if (editData) {
+      setName(editData.name || '');
+      setAccountClass(editData.accountClass || 'ASSET');
+      setAccountKind(editData.accountKind || 'GENERAL');
+      setParentId(editData.parentId || '');
+      setDescription(editData.description || '');
+    } else {
+      setName('');
+      setAccountClass('ASSET');
+      setAccountKind('BANK');
+      setParentId('');
+      setDescription('');
     }
-
-    const siblings = accounts.filter((a) => a.code.startsWith(parentPrefix));
-    const suffixes = siblings
-      .map((a) => parseInt(a.code.slice(parentPrefix.length), 10))
-      .filter((n) => !isNaN(n));
-
-    const nextSuffix = suffixes.length === 0 ? 1 : Math.max(...suffixes) + 1;
-    const generated = `${parentPrefix}${nextSuffix.toString().padStart(3, '0')}`;
-    setAutoCode(generated);
-  }, [categoryType, accounts]);
+  }, [editData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -62,70 +52,38 @@ export default function AccountModal({
     setError(null);
 
     if (!name.trim()) {
-      setError('نام حساب نمی‌تواند خالی باشد.');
+      setError('لطفاً عنوان حساب را وارد کنید.');
       return;
-    }
-
-    let accountClass: 'ASSET' | 'INCOME' | 'EXPENSE' = 'ASSET';
-    let accountKind: 'BANK' | 'CASH' | 'PERSON' | 'INCOME_HEADING' | 'EXPENSE_HEADING' = 'BANK';
-    let parentId: string | null = null;
-
-    if (categoryType === 'BANK') {
-      accountClass = 'ASSET';
-      accountKind = 'BANK';
-      const p = accounts.find((a) => a.code === '10102');
-      if (p) parentId = p.id;
-    } else if (categoryType === 'CASH') {
-      accountClass = 'ASSET';
-      accountKind = 'CASH';
-      const p = accounts.find((a) => a.code === '10101');
-      if (p) parentId = p.id;
-    } else if (categoryType === 'PERSON') {
-      accountClass = 'ASSET';
-      accountKind = 'PERSON';
-      const p = accounts.find((a) => a.code === '10201' || a.accountKind === 'PERSON');
-      if (p) parentId = p.id;
-    } else if (categoryType === 'INCOME') {
-      accountClass = 'INCOME';
-      accountKind = 'INCOME_HEADING';
-      const p = accounts.find((a) => a.code.startsWith('4'));
-      if (p) parentId = p.id;
-    } else if (categoryType === 'EXPENSE') {
-      accountClass = 'EXPENSE';
-      accountKind = 'EXPENSE_HEADING';
-      const p = accounts.find((a) => a.code.startsWith('5'));
-      if (p) parentId = p.id;
     }
 
     setLoading(true);
     try {
-      const cleanBal = initialBalance ? initialBalance.replace(/,/g, '').replace(/٬/g, '').trim() : '0';
-      const res = await fetch('/api/accounts', {
-        method: 'POST',
+      const endpoint = isEditMode ? `/api/accounts/${editData.id}` : '/api/accounts';
+      const method = isEditMode ? 'PATCH' : 'POST';
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
           accountClass,
           accountKind,
-          parentId,
-          code: customCode.trim() || autoCode,
-          initialBalance: cleanBal,
-          isFavorite,
+          parentId: parentId || null,
+          description: description.trim(),
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'خطا در ساخت حساب');
+        throw new Error(data.error || 'خطا در ذخیره حساب');
       }
 
       setName('');
-      setInitialBalance('');
-      setCustomCode('');
+      setDescription('');
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'خطای سرور');
+      setError(err.message || 'خطای برقراری ارتباط');
     } finally {
       setLoading(false);
     }
@@ -135,81 +93,26 @@ export default function AccountModal({
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
         {/* سربرگ */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-bold text-slate-800 text-base">تعریف حساب / سرفصل جدید</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+              {isEditMode ? <Edit3 className="w-4 h-4" /> : <FolderPlus className="w-4 h-4" />}
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm">
+                {isEditMode ? `ویرایش حساب «${editData.name}»` : 'ایجاد سرفصل / حساب جدید'}
+              </h2>
+              <p className="text-2xs text-slate-400">
+                {isEditMode ? `کد حساب: ${editData.code}` : 'شماره‌گذاری و کدینگ کوتاه به‌صورت خودکار محاسبه می‌شود'}
+              </p>
+            </div>
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* انتخاب نوع حساب */}
-        <div className="px-6 pt-4">
-          <label className="block text-xs font-medium text-slate-700 mb-2">نوع حساب را مشخص کنید:</label>
-          <div className="grid grid-cols-3 gap-2 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => setCategoryType('BANK')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border transition cursor-pointer ${
-                categoryType === 'BANK'
-                  ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Building2 className="w-4 h-4 text-blue-600" />
-              <span>بانک</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCategoryType('CASH')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border transition cursor-pointer ${
-                categoryType === 'CASH'
-                  ? 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Wallet className="w-4 h-4 text-emerald-600" />
-              <span>صندوق</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCategoryType('PERSON')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border transition cursor-pointer ${
-                categoryType === 'PERSON'
-                  ? 'bg-purple-50 border-purple-500 text-purple-700 font-bold'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <User className="w-4 h-4 text-purple-600" />
-              <span>شخص</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCategoryType('EXPENSE')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border transition cursor-pointer ${
-                categoryType === 'EXPENSE'
-                  ? 'bg-rose-50 border-rose-500 text-rose-700 font-bold'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <TrendingDown className="w-4 h-4 text-rose-600" />
-              <span>سرفصل هزینه</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCategoryType('INCOME')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border transition cursor-pointer col-span-2 ${
-                categoryType === 'INCOME'
-                  ? 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-              <span>سرفصل درآمد</span>
-            </button>
-          </div>
-        </div>
-
-        {/* فرم */}
+        {/* بدنه فرم */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-3.5 py-2.5 rounded-xl">
@@ -217,77 +120,79 @@ export default function AccountModal({
             </div>
           )}
 
+          {/* نام حساب */}
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              نام حساب / سرفصل *
-            </label>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">عنوان حساب *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="مثال: بانک ملت شعبه مرکزی، هزینه اینترنت..."
+              placeholder="مثال: بانک ملت - شعبه مرکزی، صندوق فروش، هزینه اینترنت"
               className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               required
+              autoFocus
             />
           </div>
 
-          {/* کدگذاری خودکار */}
-          <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-slate-700 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>کد حساب (کدگذاری خودکار):</span>
-              </span>
-              <span className="text-xs font-mono font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-md">
-                {customCode || autoCode}
-              </span>
-            </div>
-            <input
-              type="text"
-              value={customCode}
-              onChange={(e) => setCustomCode(e.target.value)}
-              placeholder={`پیش‌فرض خودکار: ${autoCode} (در صورت تمایل تغییر دهید)`}
-              className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              dir="ltr"
-            />
-          </div>
-
-          {/* موجودی اولیه */}
-          {(categoryType === 'BANK' || categoryType === 'CASH' || categoryType === 'PERSON') && (
+          {/* طبقه ماهیت حساب (در حالت ایجاد) */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5 flex items-center justify-between">
-                <span>موجودی اولیه (ریال)</span>
-                {initialBalance && <span className="text-emerald-600 text-2xs">{formatRial(initialBalance.replace(/\D/g, ''))}</span>}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={initialBalance}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, '');
-                    setInitialBalance(raw ? Number(raw).toLocaleString('en-US') : '');
-                  }}
-                  placeholder="0"
-                  className="w-full text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                  dir="ltr"
-                />
-                <DollarSign className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" />
-              </div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">طبقه حساب</label>
+              <select
+                value={accountClass}
+                onChange={(e) => setAccountClass(e.target.value as AccountClass)}
+                disabled={isEditMode}
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white disabled:opacity-60"
+              >
+                <option value="ASSET">دارایی‌ها (نقد و بانک، مطالبات)</option>
+                <option value="EXPENSE">هزینه‌ها (جاری، حقوق، اجاره)</option>
+                <option value="INCOME">درآمدها (فروش، خدمات)</option>
+                <option value="LIABILITY">بدهی‌ها (بستانکاران)</option>
+                <option value="EQUITY">حقوق صاحبان سهام / سرمایه</option>
+              </select>
             </div>
-          )}
 
-          {/* علاقه‌مندی */}
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="checkbox"
-              id="isFavorite"
-              checked={isFavorite}
-              onChange={(e) => setIsFavorite(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">نوع کاربری</label>
+              <select
+                value={accountKind}
+                onChange={(e) => setAccountKind(e.target.value as AccountKind)}
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+              >
+                <option value="BANK">حساب بانکی</option>
+                <option value="CASH">صندوق نقدی</option>
+                <option value="WALLET">کیف پول دیجیتال</option>
+                <option value="COUNTERPARTY">طرف حساب / مشتری / تامین‌کننده</option>
+                <option value="GENERAL">سایر سرفصل‌های عمومی</option>
+              </select>
+            </div>
+          </div>
+
+          {/* راهنمای کدینگ هوشمند */}
+          <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3 flex items-start gap-2.5">
+            <HelpCircle className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+            <div className="text-2xs text-blue-900 leading-relaxed">
+              <span className="font-bold">سیستم کدینگ تمیز و کوتاه:</span>{' '}
+              {isEditMode ? (
+                <span>کد حساب ثابت باقی می‌ماند ({editData.code}) تا تاریخچه اسناد معتبر بماند.</span>
+              ) : (
+                <span>
+                  کد این حساب به‌طور خودکار به صورت ترتیبی و کوتاه (مانند ۱، ۲، ۳...) ثبت می‌شود و نیازی به وارد کردن دستی کد نیست.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* توضیحات */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">یادداشت / توضیحات اختیاری</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="شماره حساب، شبای بانکی، یا یادداشت راهنما..."
+              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white resize-none"
             />
-            <label htmlFor="isFavorite" className="text-xs text-slate-700 cursor-pointer">
-              نمایش در کارت‌های خلاصه و دسترسی سریع داشبورد
-            </label>
           </div>
 
           {/* دکمه‌ها */}
@@ -302,9 +207,9 @@ export default function AccountModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 transition disabled:opacity-50 cursor-pointer"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 transition disabled:opacity-50 cursor-pointer"
             >
-              {loading ? 'در حال ثبت...' : 'ساخت حساب'}
+              {loading ? 'در حال ثبت...' : isEditMode ? 'ذخیره ویرایش حساب' : 'ایجاد حساب خودکار'}
             </button>
           </div>
         </form>

@@ -60,7 +60,7 @@ export interface Journal {
   formattedJalali: string;
   description: string | null;
   kind: 'TRANSACTION' | 'RECURRING' | 'SMS' | 'IMPORT' | 'MANUAL' | 'INVOICE' | 'CHECK';
-  status: 'DRAFT' | 'POSTED' | 'VOID';
+  status: 'POSTED' | 'VOID';
   totalDebit: string;
   totalCredit: string;
   lineCount: number;
@@ -124,180 +124,65 @@ function getDefaultStore(): DataStore {
     status: 'OPEN',
   };
 
-  // ساختار حداقلی و تمیز اولیه (کاربر هر حسابی بخواهد خودش اضافه می‌کند)
+  // کدهای تمیز و کوتاه (شروع از ۱ برای هر دسته بندی)
   const accounts: Account[] = [
-    // گروه ۱: دارایی‌ها
+    // صندوق اصلی (کد ۱)
     {
-      id: 'acc-g-1',
+      id: 'acc-cash-1',
       companyId: DEFAULT_COMPANY_ID,
       parentId: null,
-      path: '/acc-g-1/',
+      path: '/acc-cash-1/',
       depth: 1,
       accountClass: 'ASSET',
-      accountKind: 'OTHER',
+      accountKind: 'CASH',
       code: '1',
       codingLevel: 1,
-      isPostable: false,
-      name: 'دارایی‌ها',
-      icon: null,
-      color: null,
-      isFavorite: false,
-      openingBalance: '0',
-      openingSide: 'DEBIT',
-      isSystem: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    // کل ۱۰۱: نقد و بانک
-    {
-      id: 'acc-k-101',
-      companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-g-1',
-      path: '/acc-g-1/acc-k-101/',
-      depth: 2,
-      accountClass: 'ASSET',
-      accountKind: 'OTHER',
-      code: '101',
-      codingLevel: 2,
-      isPostable: false,
-      name: 'موجودی نقد و بانک',
-      icon: null,
-      color: null,
-      isFavorite: false,
-      openingBalance: '0',
-      openingSide: 'DEBIT',
-      isSystem: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    // معین ۱۰۱۰۱: صندوق‌ها
-    {
-      id: 'acc-m-10101',
-      companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-k-101',
-      path: '/acc-g-1/acc-k-101/acc-m-10101/',
-      depth: 3,
-      accountClass: 'ASSET',
-      accountKind: 'CASH',
-      code: '10101',
-      codingLevel: 3,
-      isPostable: false,
-      name: 'صندوق‌ها',
-      icon: 'wallet',
-      color: '#10B981',
-      isFavorite: false,
-      openingBalance: '0',
-      openingSide: 'DEBIT',
-      isSystem: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    // تفصیلی ۱۰۱۰۱۰۰۱: صندوق اصلی
-    {
-      id: 'acc-d-10101001',
-      companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-m-10101',
-      path: '/acc-g-1/acc-k-101/acc-m-10101/acc-d-10101001/',
-      depth: 4,
-      accountClass: 'ASSET',
-      accountKind: 'CASH',
-      code: '10101001',
-      codingLevel: 4,
       isPostable: true,
       name: 'صندوق اصلی',
       icon: 'wallet',
       color: '#10B981',
       isFavorite: true,
-      openingBalance: '25000000', // ۲۵ میلیون ریال موجودی اولیه
+      openingBalance: '25000000', // ۲۵ میلیون ریال
       openingSide: 'DEBIT',
       isSystem: false,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // معین ۱۰۱۰۲: بانک‌ها
+    // بانک ملی (کد ۲)
     {
-      id: 'acc-m-10102',
+      id: 'acc-bank-1',
       companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-k-101',
-      path: '/acc-g-1/acc-k-101/acc-m-10102/',
-      depth: 3,
+      parentId: null,
+      path: '/acc-bank-1/',
+      depth: 1,
       accountClass: 'ASSET',
       accountKind: 'BANK',
-      code: '10102',
-      codingLevel: 3,
-      isPostable: false,
-      name: 'بانک‌ها',
-      icon: 'landmark',
-      color: '#3B82F6',
-      isFavorite: false,
-      openingBalance: '0',
-      openingSide: 'DEBIT',
-      isSystem: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    // تفصیلی ۱۰۱۰۲۰۰۱: بانک ملی
-    {
-      id: 'acc-d-10102001',
-      companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-m-10102',
-      path: '/acc-g-1/acc-k-101/acc-m-10102/acc-d-10102001/',
-      depth: 4,
-      accountClass: 'ASSET',
-      accountKind: 'BANK',
-      code: '10102001',
-      codingLevel: 4,
+      code: '2',
+      codingLevel: 1,
       isPostable: true,
       name: 'بانک ملی (جاری)',
       icon: 'landmark',
       color: '#3B82F6',
       isFavorite: true,
-      openingBalance: '150000000', // ۱۵۰ میلیون ریال موجودی اولیه
+      openingBalance: '150000000', // ۱۵۰ میلیون ریال
       openingSide: 'DEBIT',
       isSystem: false,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // کل ۱۰۲: اشخاص
+    // شخص نمونه (کد ۳)
     {
-      id: 'acc-k-102',
+      id: 'acc-person-1',
       companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-g-1',
-      path: '/acc-g-1/acc-k-102/',
-      depth: 2,
+      parentId: null,
+      path: '/acc-person-1/',
+      depth: 1,
       accountClass: 'ASSET',
       accountKind: 'PERSON',
-      code: '102',
-      codingLevel: 2,
-      isPostable: false,
-      name: 'اشخاص و طرف‌حساب‌ها',
-      icon: 'users',
-      color: '#8B5CF6',
-      isFavorite: false,
-      openingBalance: '0',
-      openingSide: 'DEBIT',
-      isSystem: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    // تفصیلی ۱۰۲۰۱۰۰۱: شخص نمونه
-    {
-      id: 'acc-d-10201001',
-      companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-k-102',
-      path: '/acc-g-1/acc-k-102/acc-d-10201001/',
-      depth: 3,
-      accountClass: 'ASSET',
-      accountKind: 'PERSON',
-      code: '10201001',
-      codingLevel: 3,
+      code: '3',
+      codingLevel: 1,
       isPostable: true,
       name: 'علی محمدی',
       icon: 'user',
@@ -310,40 +195,17 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // گروه ۴: درآمدها
+    // حقوق و دستمزد (کد ۱۰)
     {
-      id: 'acc-g-4',
+      id: 'acc-inc-1',
       companyId: DEFAULT_COMPANY_ID,
       parentId: null,
-      path: '/acc-g-4/',
+      path: '/acc-inc-1/',
       depth: 1,
       accountClass: 'INCOME',
       accountKind: 'INCOME_HEADING',
-      code: '4',
+      code: '10',
       codingLevel: 1,
-      isPostable: false,
-      name: 'درآمدها',
-      icon: 'trending-up',
-      color: '#10B981',
-      isFavorite: false,
-      openingBalance: '0',
-      openingSide: 'DEBIT',
-      isSystem: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    // تفصیلی ۴۰۱۰۱۰۰۱: حقوق و دستمزد
-    {
-      id: 'acc-d-40101001',
-      companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-g-4',
-      path: '/acc-g-4/acc-d-40101001/',
-      depth: 2,
-      accountClass: 'INCOME',
-      accountKind: 'INCOME_HEADING',
-      code: '40101001',
-      codingLevel: 2,
       isPostable: true,
       name: 'حقوق و دستمزد',
       icon: 'briefcase',
@@ -356,40 +218,17 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // گروه ۵: هزینه‌ها
+    // خوراک و اقلام روزمره (کد ۲۰)
     {
-      id: 'acc-g-5',
+      id: 'acc-exp-1',
       companyId: DEFAULT_COMPANY_ID,
       parentId: null,
-      path: '/acc-g-5/',
+      path: '/acc-exp-1/',
       depth: 1,
       accountClass: 'EXPENSE',
       accountKind: 'EXPENSE_HEADING',
-      code: '5',
+      code: '20',
       codingLevel: 1,
-      isPostable: false,
-      name: 'هزینه‌ها',
-      icon: 'trending-down',
-      color: '#EF4444',
-      isFavorite: false,
-      openingBalance: '0',
-      openingSide: 'DEBIT',
-      isSystem: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    // تفصیلی ۵۰۱۰۱۰۰۱: خوراک و اقلام روزمره
-    {
-      id: 'acc-d-50101001',
-      companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-g-5',
-      path: '/acc-g-5/acc-d-50101001/',
-      depth: 2,
-      accountClass: 'EXPENSE',
-      accountKind: 'EXPENSE_HEADING',
-      code: '50101001',
-      codingLevel: 2,
       isPostable: true,
       name: 'خوراک و اقلام روزمره',
       icon: 'utensils',
@@ -402,17 +241,17 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // تفصیلی ۵۰۱۰۲۰۰۱: مسکن و شارژ
+    // مسکن و شارژ (کد ۲۱)
     {
-      id: 'acc-d-50102001',
+      id: 'acc-exp-2',
       companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-g-5',
-      path: '/acc-g-5/acc-d-50102001/',
-      depth: 2,
+      parentId: null,
+      path: '/acc-exp-2/',
+      depth: 1,
       accountClass: 'EXPENSE',
       accountKind: 'EXPENSE_HEADING',
-      code: '50102001',
-      codingLevel: 2,
+      code: '21',
+      codingLevel: 1,
       isPostable: true,
       name: 'مسکن، اجاره و شارژ',
       icon: 'home',
@@ -425,17 +264,17 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // تفصیلی ۵۰۱۰۸۰۰۱: کارمزد بانکی
+    // کارمزد بانکی (کد ۲۹)
     {
-      id: 'acc-d-50108001',
+      id: 'acc-exp-fee',
       companyId: DEFAULT_COMPANY_ID,
-      parentId: 'acc-g-5',
-      path: '/acc-g-5/acc-d-50108001/',
-      depth: 2,
+      parentId: null,
+      path: '/acc-exp-fee/',
+      depth: 1,
       accountClass: 'EXPENSE',
       accountKind: 'EXPENSE_HEADING',
-      code: '50108001',
-      codingLevel: 2,
+      code: '29',
+      codingLevel: 1,
       isPostable: true,
       name: 'کارمزد بانکی',
       icon: 'credit-card',
@@ -489,47 +328,29 @@ function saveStore(store: DataStore): void {
 }
 
 /**
- * تولید کد خودکار حساب‌ها بر اساس والد و کلاس (مطابق با fn_next_account_code)
+ * تولید خودکار کدهای تمیز و کوتاه (مثلاً برای بانک/صندوق: ۱، ۲، ۳... یا بر اساس نوع)
  */
 export function generateNextAccountCode(
-  parentAccount: Account | null,
+  accountKind: Account['accountKind'],
   accountClass: Account['accountClass'],
   existingAccounts: Account[]
 ): string {
-  if (!parentAccount) {
-    const classPrefix =
-      accountClass === 'ASSET'
-        ? '1'
-        : accountClass === 'LIABILITY'
-        ? '2'
-        : accountClass === 'EQUITY'
-        ? '3'
-        : accountClass === 'INCOME'
-        ? '4'
-        : '5';
+  // اگر بانک یا صندوق است: کدهای عددی ۱ تا ۹
+  let baseStart = 1;
+  if (accountKind === 'PERSON') baseStart = 5;
+  if (accountClass === 'INCOME') baseStart = 10;
+  if (accountClass === 'EXPENSE') baseStart = 20;
 
-    const rootCodes = existingAccounts
-      .filter((a) => a.parentId === null && a.code.startsWith(classPrefix))
-      .map((a) => parseInt(a.code, 10))
-      .filter((n) => !isNaN(n));
-
-    if (rootCodes.length === 0) return classPrefix;
-    return (Math.max(...rootCodes) + 1).toString();
-  }
-
-  const parentCode = parentAccount.code;
-  const padLen = parentAccount.depth <= 2 ? 2 : 3;
-
-  const siblingCodes = existingAccounts
-    .filter((a) => a.parentId === parentAccount.id && a.code.startsWith(parentCode))
-    .map((a) => {
-      const suffix = a.code.slice(parentCode.length);
-      return parseInt(suffix, 10);
-    })
+  const codes = existingAccounts
+    .map((a) => parseInt(a.code, 10))
     .filter((n) => !isNaN(n));
 
-  const nextNum = siblingCodes.length === 0 ? 1 : Math.max(...siblingCodes) + 1;
-  return `${parentCode}${nextNum.toString().padStart(padLen, '0')}`;
+  let candidate = baseStart;
+  while (codes.includes(candidate)) {
+    candidate += 1;
+  }
+
+  return candidate.toString();
 }
 
 /**
@@ -538,13 +359,13 @@ export function generateNextAccountCode(
 export function calculateAccountBalances(store: DataStore): Map<string, bigint> {
   const balances = new Map<string, bigint>();
 
-  // شروع از موجودی اولیه
+  // موجودی اولیه
   for (const acc of store.accounts) {
     const opening = BigInt(acc.openingBalance || '0');
     balances.set(acc.id, opening);
   }
 
-  // اعمال خطوط سند ثبت‌شده
+  // گردش خطوط اسناد ثبت‌شده
   for (const line of store.journalLines) {
     const journal = store.journals.find((j) => j.id === line.journalId);
     if (!journal || journal.status !== 'POSTED') continue;
@@ -562,7 +383,6 @@ export function calculateAccountBalances(store: DataStore): Map<string, bigint> 
         balances.set(line.accountId, current - amount);
       }
     } else {
-      // LIABILITY, EQUITY, INCOME
       if (line.side === 'CREDIT') {
         balances.set(line.accountId, current + amount);
       } else {
@@ -582,7 +402,6 @@ export function getDashboardData() {
   const store = loadStore();
   const balances = calculateAccountBalances(store);
 
-  // نقد و بانک (صندوق + بانک‌ها)
   let totalCashAndBank = 0n;
   const cashAndBankAccounts: Account[] = [];
 
@@ -598,7 +417,6 @@ export function getDashboardData() {
     }
   }
 
-  // درآمد و هزینه ماه جاری
   const todayDetails = fromDate(new Date());
   let currentMonthIncome = 0n;
   let currentMonthExpense = 0n;
@@ -640,7 +458,9 @@ export function getDashboardData() {
         refNo: j.refNo,
         amount: dstLine ? dstLine.amount : j.totalDebit,
         fee: feeLine ? feeLine.amount : '0',
+        sourceAccountId: srcAcc?.id,
         sourceName: srcAcc ? srcAcc.name : 'نامشخص',
+        destinationAccountId: dstAcc?.id,
         destinationName: dstAcc ? dstAcc.name : 'نامشخص',
         kind: j.kind,
       };
@@ -683,30 +503,44 @@ export function createNewAccount(data: {
 }) {
   const store = loadStore();
 
-  const parent = data.parentId ? store.accounts.find((a) => a.id === data.parentId) || null : null;
-  const depth = parent ? parent.depth + 1 : 1;
-  const pathStr = parent ? `${parent.path}acc-${Date.now()}/` : `/acc-${Date.now()}/`;
-
-  // تولید خودکار کد در صورت وارد نشدن
-  const code = data.code?.trim() || generateNextAccountCode(parent, data.accountClass, store.accounts);
+  const code =
+    data.code?.trim() ||
+    generateNextAccountCode(data.accountKind, data.accountClass, store.accounts);
 
   const newAccount: Account = {
     id: `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     companyId: DEFAULT_COMPANY_ID,
-    parentId: parent ? parent.id : null,
-    path: pathStr,
-    depth,
+    parentId: data.parentId || null,
+    path: `/acc-${Date.now()}/`,
+    depth: 1,
     accountClass: data.accountClass,
     accountKind: data.accountKind,
     code,
-    codingLevel: depth,
+    codingLevel: 1,
     isPostable: true,
     name: data.name.trim(),
-    icon: data.icon || (data.accountClass === 'INCOME' ? 'trending-up' : data.accountClass === 'EXPENSE' ? 'trending-down' : 'wallet'),
-    color: data.color || (data.accountClass === 'INCOME' ? '#10B981' : data.accountClass === 'EXPENSE' ? '#EF4444' : '#3B82F6'),
-    isFavorite: !!data.isFavorite,
+    icon:
+      data.icon ||
+      (data.accountClass === 'INCOME'
+        ? 'trending-up'
+        : data.accountClass === 'EXPENSE'
+        ? 'trending-down'
+        : data.accountKind === 'PERSON'
+        ? 'user'
+        : 'wallet'),
+    color:
+      data.color ||
+      (data.accountClass === 'INCOME'
+        ? '#10B981'
+        : data.accountClass === 'EXPENSE'
+        ? '#EF4444'
+        : data.accountKind === 'PERSON'
+        ? '#8B5CF6'
+        : '#3B82F6'),
+    isFavorite: data.isFavorite !== undefined ? data.isFavorite : true,
     openingBalance: data.initialBalance ? BigInt(Math.round(Number(data.initialBalance))).toString() : '0',
-    openingSide: data.accountClass === 'ASSET' || data.accountClass === 'EXPENSE' ? 'DEBIT' : 'CREDIT',
+    openingSide:
+      data.accountClass === 'ASSET' || data.accountClass === 'EXPENSE' ? 'DEBIT' : 'CREDIT',
     isSystem: false,
     isActive: true,
     createdAt: new Date().toISOString(),
@@ -717,6 +551,36 @@ export function createNewAccount(data: {
   saveStore(store);
 
   return newAccount;
+}
+
+export function updateAccount(
+  id: string,
+  data: {
+    name?: string;
+    code?: string;
+    color?: string;
+    icon?: string;
+    isFavorite?: boolean;
+    initialBalance?: string;
+  }
+) {
+  const store = loadStore();
+  const acc = store.accounts.find((a) => a.id === id);
+
+  if (!acc) throw new Error('حساب مورد نظر پیدا نشد.');
+
+  if (data.name) acc.name = data.name.trim();
+  if (data.code) acc.code = data.code.trim();
+  if (data.color) acc.color = data.color;
+  if (data.icon) acc.icon = data.icon;
+  if (data.isFavorite !== undefined) acc.isFavorite = data.isFavorite;
+  if (data.initialBalance !== undefined) {
+    acc.openingBalance = BigInt(Math.round(Number(data.initialBalance) || 0)).toString();
+  }
+  acc.updatedAt = new Date().toISOString();
+
+  saveStore(store);
+  return acc;
 }
 
 export function deleteAccountById(id: string) {
@@ -732,21 +596,90 @@ export function deleteAccountById(id: string) {
     throw new Error('حساب‌های سیستمی قابل حذف نیستند.');
   }
 
-  // بررسی گردش
   const hasActivity = store.journalLines.some((l) => l.accountId === id);
   if (hasActivity) {
     throw new Error('حساب دارای تراکنش و گردش مالی است و قابل حذف نیست (می‌توانید آن را غیرفعال کنید).');
   }
 
-  // بررسی زیرحساب
-  const hasChildren = store.accounts.some((a) => a.parentId === id);
-  if (hasChildren) {
-    throw new Error('این حساب دارای زیرمجموعه است و ابتدا باید زیرحساب‌های آن حذف شوند.');
-  }
-
   store.accounts.splice(accIndex, 1);
   saveStore(store);
   return { success: true };
+}
+
+/**
+ * گزارش گردش حساب (Account Ledger Statement) با ماندهٔ لحظه‌ای
+ */
+export function getAccountLedger(accountId: string) {
+  const store = loadStore();
+  const acc = store.accounts.find((a) => a.id === accountId);
+  if (!acc) throw new Error('حساب پیدا نشد.');
+
+  const openingBal = BigInt(acc.openingBalance || '0');
+  let running = openingBal;
+
+  const entries: any[] = [];
+
+  // ورودی موجودی اولیه
+  if (openingBal > 0n) {
+    entries.push({
+      id: 'opening',
+      serialNo: '—',
+      date: 'افتتاحیه',
+      formattedJalali: 'موجودی اولیه',
+      description: 'موجودی اولیه حساب',
+      counterAccountName: 'سند افتتاحیه',
+      debit: acc.openingSide === 'DEBIT' ? openingBal.toString() : '0',
+      credit: acc.openingSide === 'CREDIT' ? openingBal.toString() : '0',
+      runningBalance: running.toString(),
+      refNo: null,
+    });
+  }
+
+  // گردش خطوط
+  for (const line of store.journalLines) {
+    if (line.accountId !== accountId) continue;
+    const j = store.journals.find((x) => x.id === line.journalId);
+    if (!j || j.status !== 'POSTED') continue;
+
+    const amount = BigInt(line.amount);
+
+    if (acc.accountClass === 'ASSET' || acc.accountClass === 'EXPENSE') {
+      if (line.side === 'DEBIT') running += amount;
+      else running -= amount;
+    } else {
+      if (line.side === 'CREDIT') running += amount;
+      else running -= amount;
+    }
+
+    // پیدا کردن حساب مقابل
+    const otherLine = j.lines.find((l) => l.id !== line.id && l.lineRole !== 'FEE');
+    const otherAcc = store.accounts.find((a) => a.id === otherLine?.accountId);
+
+    entries.push({
+      id: line.id,
+      journalId: j.id,
+      serialNo: j.serialNo,
+      date: j.date,
+      formattedJalali: j.formattedJalali,
+      description: line.description || j.description || 'بدون شرح',
+      counterAccountName: otherAcc ? otherAcc.name : 'سایر حساب‌ها',
+      debit: line.side === 'DEBIT' ? amount.toString() : '0',
+      credit: line.side === 'CREDIT' ? amount.toString() : '0',
+      runningBalance: running.toString(),
+      refNo: j.refNo,
+    });
+  }
+
+  return {
+    account: {
+      ...acc,
+      currentBalance: running.toString(),
+    },
+    entries,
+    totalDebit: entries.reduce((s, e) => s + BigInt(e.debit || 0), 0n).toString(),
+    totalCredit: entries.reduce((s, e) => s + BigInt(e.credit || 0), 0n).toString(),
+    finalBalance: running.toString(),
+  };
 }
 
 export function createTransaction(data: {
@@ -774,13 +707,10 @@ export function createTransaction(data: {
 
   const feeBig = data.fee ? BigInt(Math.round(Number(data.fee))) : 0n;
 
-  // محاسبه تاریخ شمسی
   let dateDetails;
   if (data.shamsiDate) {
     const parsed = parseJalali(data.shamsiDate);
-    // ساخت Date
     dateDetails = fromDate(new Date(Date.UTC(parsed.jy > 1000 ? parsed.jy + 621 : 2026, parsed.jm - 1, parsed.jd)));
-    // اصلاح فیلدهای شمسی از مقدار دقیق پارس‌شده
     dateDetails.jy = parsed.jy;
     dateDetails.jm = parsed.jm;
     dateDetails.jd = parsed.jd;
@@ -795,7 +725,7 @@ export function createTransaction(data: {
   const journalId = `j-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   const lines: JournalLine[] = [];
 
-  // سطر ۱: بستانکار حساب مبدأ
+  // سطر ۱: بستانکار مبدأ
   lines.push({
     id: `jl-${Date.now()}-1`,
     journalId,
@@ -812,7 +742,7 @@ export function createTransaction(data: {
     jalaliMonth: dateDetails.jm,
   });
 
-  // سطر ۲: بدهکار حساب مقصد
+  // سطر ۲: بدهکار مقصد
   lines.push({
     id: `jl-${Date.now()}-2`,
     journalId,
@@ -829,12 +759,11 @@ export function createTransaction(data: {
     jalaliMonth: dateDetails.jm,
   });
 
-  // سطر ۳: کارمزد بانکی (در صورت وجود)
+  // سطر ۳: کارمزد بانکی
   if (feeBig > 0n) {
-    let feeAcc = store.accounts.find((a) => a.code === '50108001' || a.name.includes('کارمزد'));
-    if (!feeAcc) {
-      feeAcc = srcAcc;
-    }
+    let feeAcc = store.accounts.find((a) => a.code === '29' || a.name.includes('کارمزد'));
+    if (!feeAcc) feeAcc = srcAcc;
+
     lines.push({
       id: `jl-${Date.now()}-3`,
       journalId,
@@ -889,16 +818,124 @@ export function createTransaction(data: {
   return journal;
 }
 
+export function updateTransaction(
+  journalId: string,
+  data: {
+    sourceAccountId: string;
+    destinationAccountId: string;
+    amount: string | number;
+    fee?: string | number;
+    shamsiDate?: string;
+    description?: string;
+    refNo?: string;
+  }
+) {
+  const store = loadStore();
+  const journal = store.journals.find((j) => j.id === journalId);
+  if (!journal) throw new Error('سند پیدا نشد.');
+  if (journal.status === 'VOID') throw new Error('سند باطل‌شده قابل ویرایش نیست.');
+
+  const srcAcc = store.accounts.find((a) => a.id === data.sourceAccountId);
+  const dstAcc = store.accounts.find((a) => a.id === data.destinationAccountId);
+  if (!srcAcc || !dstAcc) throw new Error('حساب مبدأ یا مقصد نامعتبر است.');
+
+  const amountBig = BigInt(Math.round(Number(data.amount)));
+  if (amountBig <= 0n) throw new Error('مبلغ باید بزرگ‌تر از صفر باشد.');
+  const feeBig = data.fee ? BigInt(Math.round(Number(data.fee))) : 0n;
+
+  let dateDetails;
+  if (data.shamsiDate) {
+    const parsed = parseJalali(data.shamsiDate);
+    dateDetails = fromDate(new Date(Date.UTC(parsed.jy > 1000 ? parsed.jy + 621 : 2026, parsed.jm - 1, parsed.jd)));
+    dateDetails.jy = parsed.jy;
+    dateDetails.jm = parsed.jm;
+    dateDetails.jd = parsed.jd;
+    dateDetails.formattedJalali = formatJalali(parsed.jy, parsed.jm, parsed.jd);
+  } else {
+    dateDetails = fromDate(new Date());
+  }
+
+  // حذف خطوط قدیمی
+  store.journalLines = store.journalLines.filter((l) => l.journalId !== journalId);
+
+  const lines: JournalLine[] = [];
+  lines.push({
+    id: `jl-${Date.now()}-1`,
+    journalId,
+    companyId: DEFAULT_COMPANY_ID,
+    lineNo: 1,
+    accountId: srcAcc.id,
+    accountName: srcAcc.name,
+    side: 'CREDIT',
+    amount: (amountBig + feeBig).toString(),
+    lineRole: 'SOURCE',
+    description: data.description || null,
+    fiscalPeriodId: `fp-${dateDetails.jy}-${dateDetails.jm}`,
+    jalaliYear: dateDetails.jy,
+    jalaliMonth: dateDetails.jm,
+  });
+
+  lines.push({
+    id: `jl-${Date.now()}-2`,
+    journalId,
+    companyId: DEFAULT_COMPANY_ID,
+    lineNo: 2,
+    accountId: dstAcc.id,
+    accountName: dstAcc.name,
+    side: 'DEBIT',
+    amount: amountBig.toString(),
+    lineRole: 'DESTINATION',
+    description: data.description || null,
+    fiscalPeriodId: `fp-${dateDetails.jy}-${dateDetails.jm}`,
+    jalaliYear: dateDetails.jy,
+    jalaliMonth: dateDetails.jm,
+  });
+
+  if (feeBig > 0n) {
+    let feeAcc = store.accounts.find((a) => a.code === '29' || a.name.includes('کارمزد'));
+    if (!feeAcc) feeAcc = srcAcc;
+    lines.push({
+      id: `jl-${Date.now()}-3`,
+      journalId,
+      companyId: DEFAULT_COMPANY_ID,
+      lineNo: 3,
+      accountId: feeAcc.id,
+      accountName: feeAcc.name,
+      side: 'DEBIT',
+      amount: feeBig.toString(),
+      lineRole: 'FEE',
+      description: 'کارمزد بانکی',
+      fiscalPeriodId: `fp-${dateDetails.jy}-${dateDetails.jm}`,
+      jalaliYear: dateDetails.jy,
+      jalaliMonth: dateDetails.jm,
+    });
+  }
+
+  journal.date = dateDetails.formattedGregorian;
+  journal.jalaliYear = dateDetails.jy;
+  journal.jalaliMonth = dateDetails.jm;
+  journal.jalaliDay = dateDetails.jd;
+  journal.formattedJalali = dateDetails.formattedJalali;
+  journal.description = data.description || null;
+  journal.refNo = data.refNo || null;
+  journal.totalDebit = (amountBig + feeBig).toString();
+  journal.totalCredit = (amountBig + feeBig).toString();
+  journal.lineCount = lines.length;
+  journal.updatedAt = new Date().toISOString();
+  journal.lines = lines;
+
+  store.journalLines.push(...lines);
+  saveStore(store);
+
+  return journal;
+}
+
 export function voidTransaction(journalId: string, reason: string) {
   const store = loadStore();
   const journal = store.journals.find((j) => j.id === journalId);
 
-  if (!journal) {
-    throw new Error('سند مورد نظر پیدا نشد.');
-  }
-  if (journal.status === 'VOID') {
-    throw new Error('این سند قبلاً باطل شده است.');
-  }
+  if (!journal) throw new Error('سند مورد نظر پیدا نشد.');
+  if (journal.status === 'VOID') throw new Error('این سند قبلاً باطل شده است.');
 
   journal.status = 'VOID';
   journal.voidReason = reason || 'ابطال توسط کاربر';

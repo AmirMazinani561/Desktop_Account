@@ -9,13 +9,15 @@ import {
   TrendingUp,
   Plus,
   Trash2,
-  Sparkles,
   Search,
   CheckCircle2,
   AlertCircle,
+  FileSpreadsheet,
+  Edit2,
 } from 'lucide-react';
 import { formatRial } from '@/lib/formatters';
 import AccountModal from '@/components/AccountModal';
+import AccountLedgerModal from '@/components/AccountLedgerModal';
 import { AccountOption } from '@/types';
 
 export default function AccountsPage() {
@@ -23,7 +25,11 @@ export default function AccountsPage() {
   const [filter, setFilter] = useState<'ALL' | 'CASH_BANK' | 'PERSON' | 'INCOME' | 'EXPENSE'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any | null>(null);
+  
+  const [ledgerAccountId, setLedgerAccountId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const loadAccounts = async () => {
@@ -68,9 +74,14 @@ export default function AccountsPage() {
     setTimeout(() => setActionMessage(null), 5000);
   };
 
+  const handleEdit = (acc: any) => {
+    setEditingAccount(acc);
+    setIsModalOpen(true);
+  };
+
   // فیلتر کردن
   const filteredAccounts = accounts.filter((a) => {
-    if (!a.isPostable) return false; // فقط حساب‌های برگ قابل‌ثبت
+    if (!a.isPostable) return false;
 
     const matchesSearch =
       a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -78,8 +89,8 @@ export default function AccountsPage() {
 
     if (!matchesSearch) return false;
 
-    if (filter === 'CASH_BANK') return a.accountKind === 'CASH' || a.accountKind === 'BANK';
-    if (filter === 'PERSON') return a.accountKind === 'PERSON';
+    if (filter === 'CASH_BANK') return a.accountKind === 'CASH' || a.accountKind === 'BANK' || a.accountKind === 'WALLET';
+    if (filter === 'PERSON') return a.accountKind === 'PERSON' || a.accountKind === 'COUNTERPARTY';
     if (filter === 'INCOME') return a.accountClass === 'INCOME';
     if (filter === 'EXPENSE') return a.accountClass === 'EXPENSE';
     return true;
@@ -92,11 +103,14 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-lg font-bold text-slate-800">مدیریت حساب‌ها و سرفصل‌ها</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            تعریف حساب‌های بانکی، صندوق‌ها، طرف‌حساب‌ها و سرفصل‌های درآمد و هزینه با کدگذاری خودکار
+            تعریف حساب‌های بانکی، صندوق‌ها، طرف‌حساب‌ها و سرفصل‌ها با کدگذاری کوتاه، ویرایش، و صورت‌حساب ریزگردش
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingAccount(null);
+            setIsModalOpen(true);
+          }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-500/20 transition cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -148,7 +162,7 @@ export default function AccountsPage() {
             }`}
           >
             <User className="w-3.5 h-3.5" />
-            <span>اشخاص</span>
+            <span>اشخاص و طرف‌حساب‌ها</span>
           </button>
           <button
             onClick={() => setFilter('INCOME')}
@@ -212,7 +226,7 @@ export default function AccountsPage() {
                           <Wallet className="w-4 h-4" />
                         ) : acc.accountKind === 'BANK' ? (
                           <Building2 className="w-4 h-4" />
-                        ) : acc.accountKind === 'PERSON' ? (
+                        ) : acc.accountKind === 'PERSON' || acc.accountKind === 'COUNTERPARTY' ? (
                           <User className="w-4 h-4" />
                         ) : isIncome ? (
                           <TrendingUp className="w-4 h-4" />
@@ -223,7 +237,7 @@ export default function AccountsPage() {
                       <div>
                         <h3 className="text-xs font-bold text-slate-900">{acc.name}</h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-3xs font-mono font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          <span className="text-3xs font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
                             کد: {acc.code}
                           </span>
                           {acc.isSystem && (
@@ -233,23 +247,43 @@ export default function AccountsPage() {
                       </div>
                     </div>
 
-                    {!acc.isSystem && (
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleDelete(acc.id, acc.name)}
-                        className="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition"
-                        title="حذف حساب"
+                        onClick={() => handleEdit(acc)}
+                        className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                        title="ویرایش مشخصات حساب"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                    )}
+                      {!acc.isSystem && (
+                        <button
+                          onClick={() => handleDelete(acc.id, acc.name)}
+                          className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          title="حذف حساب"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-2xs text-slate-500">مانده لحظه‌ای:</span>
-                  <span className="text-xs font-bold font-mono text-slate-900">
-                    {formatRial(acc.currentBalance)}
-                  </span>
+                <div className="pt-3 mt-3 border-t border-slate-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xs text-slate-500">مانده لحظه‌ای:</span>
+                    <span className="text-xs font-bold font-mono text-slate-900">
+                      {formatRial(acc.currentBalance)}
+                    </span>
+                  </div>
+
+                  {/* دکمه صورت‌حساب حساب */}
+                  <button
+                    onClick={() => setLedgerAccountId(acc.id)}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-xl text-2xs font-medium transition cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-blue-500" />
+                    <span>مشاهده ریزگردش و صورت‌حساب</span>
+                  </button>
                 </div>
               </div>
             );
@@ -257,15 +291,28 @@ export default function AccountsPage() {
         </div>
       )}
 
+      {/* مودال تعریف و ویرایش حساب */}
       <AccountModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingAccount(null);
+        }}
         onSuccess={() => {
           loadAccounts();
           window.dispatchEvent(new Event('refresh-financial-data'));
         }}
-        accounts={accounts}
+        editData={editingAccount}
       />
+
+      {/* مودال صورت‌حساب معین */}
+      {ledgerAccountId && (
+        <AccountLedgerModal
+          isOpen={!!ledgerAccountId}
+          onClose={() => setLedgerAccountId(null)}
+          accountId={ledgerAccountId}
+        />
+      )}
     </div>
   );
 }

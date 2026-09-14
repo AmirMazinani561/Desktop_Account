@@ -1,3 +1,6 @@
+export type AccountClass = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+export type AccountKind = 'BANK' | 'CASH' | 'WALLET' | 'COUNTERPARTY' | 'GENERAL' | 'PERSON';
+
 export interface AccountOption {
   id: string;
   name: string;
