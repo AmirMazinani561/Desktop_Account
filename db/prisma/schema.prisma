@@ -171,6 +171,8 @@ enum SerialKind {
   CHECK_PAYABLE
   STOCK_MOVE
   PRODUCTION_ORDER
+  COUNTERPARTY
+  ACCOUNT
 }
 
 enum AttachmentOwnerType {
@@ -488,6 +490,8 @@ model Counterparty {
   id              String           @id @default(uuid()) @db.Uuid
   companyId       String           @map("company_id") @db.Uuid
   type            CounterpartyType
+  /// کد یکتای طرف‌حساب (مثلاً ۴۰۰۰۱، ۴۰۰۰۲ یا خودکار) — الزامی طبق اصل کدگذاری خودکار
+  code            String?          @db.VarChar(30)
   name            String           @db.VarChar(200)
   nationalId      String?          @map("national_id") @db.VarChar(20)
   companyRegNo    String?          @map("company_reg_no") @db.VarChar(30)
@@ -513,6 +517,7 @@ model Counterparty {
 
   @@unique([companyId, nationalId])
   @@unique([companyId, linkedAccountId])
+  @@index([companyId, code])
   @@index([companyId, isActive, name])
   @@map("counterparties")
 }

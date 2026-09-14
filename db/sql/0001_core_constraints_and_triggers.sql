@@ -171,6 +171,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_counterparties_name
   ON counterparties (company_id, type, lower(name))
   WHERE deleted_at IS NULL;
 
+-- کد یکتای طرف‌حساب (تولید خودکار یا دستی)
+CREATE UNIQUE INDEX IF NOT EXISTS ux_counterparties_code
+  ON counterparties (company_id, code)
+  WHERE code IS NOT NULL AND deleted_at IS NULL;
+
 -- ایندکس‌های کمکی گزارش‌گیری (partial تا حجم کم بماند)
 CREATE INDEX IF NOT EXISTS ix_journal_lines_posted_period
   ON journal_lines (company_id, account_id, jalali_year, jalali_month, amount)
@@ -231,6 +236,14 @@ BEGIN
     NEW.depth := v_parent_depth + 1;
   END IF;
 
+  -- کدگذاری خودکار اگر کد وارد نشده باشد
+  IF NEW.code IS NULL OR btrim(NEW.code) = '' THEN
+    NEW.code := fn_next_account_code(NEW.company_id, NEW.parent_id, NEW.account_class);
+  END IF;
+  IF NEW.coding_level IS NULL THEN
+    NEW.coding_level := LEAST(NEW.depth, 4::smallint);
+  END IF;
+
   -- اگر والد عوض شد، مسیر زیردرخت هم باید بازنشانی شود
   IF TG_OP = 'UPDATE' AND OLD.parent_id IS DISTINCT FROM NEW.parent_id THEN
     UPDATE accounts c
@@ -286,6 +299,21 @@ DROP TRIGGER IF EXISTS trg_accounts_guard ON accounts;
 CREATE TRIGGER trg_accounts_guard
   BEFORE UPDATE OR DELETE ON accounts
   FOR EACH ROW EXECUTE FUNCTION fn_accounts_guard();
+
+-- ۳.۳.ب طرف‌حساب: کدگذاری خودکار در صورت وارد نشدن کد
+CREATE OR REPLACE FUNCTION fn_counterparties_auto_code() RETURNS trigger AS $fn$
+BEGIN
+  IF NEW.code IS NULL OR btrim(NEW.code) = '' THEN
+    NEW.code := fn_next_counterparty_code(NEW.company_id, NEW.type);
+  END IF;
+  RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_counterparties_auto_code ON counterparties;
+CREATE TRIGGER trg_counterparties_auto_code
+  BEFORE INSERT ON counterparties
+  FOR EACH ROW EXECUTE FUNCTION fn_counterparties_auto_code();
 
 -- ۳.۴ آرتیکل: پیش‌بررسی (تغییرناپذیری سند، حساب قابل‌ثبت، قفل دوره)
 CREATE OR REPLACE FUNCTION fn_journal_lines_precheck() RETURNS trigger AS $fn$
@@ -482,8 +510,86 @@ CREATE TRIGGER trg_fiscal_periods_lock_guard
   FOR EACH ROW EXECUTE FUNCTION fn_fiscal_periods_lock_guard();
 
 -- -----------------------------------------------------------------------------
--- ۴) توابع سرویس — شماره‌گذاری بی‌شکاف و اسنپ‌شات مانده
+-- ۴) توابع سرویس — شماره‌گذاری و کدگذاری خودکار، شماره‌گذاری بی‌شکاف و مانده
 -- -----------------------------------------------------------------------------
+
+-- تولید کد خودکار سلسله‌مراتبی برای حساب‌ها (گروه/کل/معین/تفصیلی)
+CREATE OR REPLACE FUNCTION fn_next_account_code(
+  p_company_id uuid,
+  p_parent_id uuid,
+  p_account_class "AccountClass"
+) RETURNS varchar AS $fn$
+DECLARE
+  v_parent_code varchar;
+  v_parent_depth integer;
+  v_next_suffix integer;
+  v_pad_len integer;
+  v_code varchar;
+BEGIN
+  IF p_parent_id IS NULL THEN
+    v_code := CASE p_account_class::text
+      WHEN 'ASSET'     THEN '1'
+      WHEN 'LIABILITY' THEN '2'
+      WHEN 'EQUITY'    THEN '3'
+      WHEN 'INCOME'    THEN '4'
+      WHEN 'EXPENSE'   THEN '5'
+      ELSE '9'
+    END;
+    IF EXISTS (SELECT 1 FROM accounts WHERE company_id = p_company_id AND parent_id IS NULL AND code = v_code AND deleted_at IS NULL) THEN
+      SELECT COALESCE(max(code::integer), v_code::integer) + 1 INTO v_next_suffix
+        FROM accounts
+       WHERE company_id = p_company_id AND parent_id IS NULL AND code ~ '^[0-9]+$' AND deleted_at IS NULL;
+      v_code := v_next_suffix::varchar;
+    END IF;
+    RETURN v_code;
+  END IF;
+
+  SELECT a.code, a.depth INTO v_parent_code, v_parent_depth
+    FROM accounts a
+   WHERE a.id = p_parent_id AND a.company_id = p_company_id;
+
+  IF v_parent_code IS NULL THEN
+    v_parent_code := '101';
+    v_parent_depth := 1;
+  END IF;
+
+  v_pad_len := CASE WHEN v_parent_depth <= 2 THEN 2 ELSE 3 END;
+
+  SELECT COALESCE(max(substring(a.code from length(v_parent_code) + 1)::integer), 0) + 1
+    INTO v_next_suffix
+    FROM accounts a
+   WHERE a.company_id = p_company_id
+     AND a.parent_id = p_parent_id
+     AND a.code LIKE v_parent_code || '%'
+     AND substring(a.code from length(v_parent_code) + 1) ~ '^[0-9]+$'
+     AND a.deleted_at IS NULL;
+
+  RETURN v_parent_code || lpad(v_next_suffix::varchar, v_pad_len, '0');
+END;
+$fn$ LANGUAGE plpgsql;
+
+-- تولید کد خودکار برای اشخاص و طرف‌حساب‌ها (مثلاً PR-01001 یا CO-01001)
+CREATE OR REPLACE FUNCTION fn_next_counterparty_code(
+  p_company_id uuid,
+  p_type "CounterpartyType"
+) RETURNS varchar AS $fn$
+DECLARE
+  v_prefix varchar;
+  v_next_no bigint;
+BEGIN
+  v_prefix := CASE WHEN p_type::text = 'LEGAL' THEN 'CO-' ELSE 'PR-' END;
+  
+  SELECT COALESCE(max(substring(c.code from length(v_prefix) + 1)::bigint), 1000) + 1
+    INTO v_next_no
+    FROM counterparties c
+   WHERE c.company_id = p_company_id
+     AND c.code LIKE v_prefix || '%'
+     AND substring(c.code from length(v_prefix) + 1) ~ '^[0-9]+$'
+     AND c.deleted_at IS NULL;
+
+  RETURN v_prefix || lpad(v_next_no::varchar, 5, '0');
+END;
+$fn$ LANGUAGE plpgsql;
 
 -- شمارهٔ بعدی سند/فاکتور/چک. قفل سطری تا پایان تراکنش نگه داشته می‌شود،
 -- پس اگر تراکنش رول‌بک شود شماره هم برمی‌گردد → شمارهٔ شکاف‌دار ایجاد نمی‌شود.
