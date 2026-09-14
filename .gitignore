@@ -1,0 +1,35 @@
+# وابستگی‌ها و ساخته‌های build
+node_modules/
+.pnp
+.pnp.js
+dist/
+build/
+.next/
+out/
+coverage/
+
+# محیط و رازها — هرگز کامیت نشوند
+.env
+.env.*
+!.env.example
+*.pem
+secrets/
+
+# خروجی‌های حجیم (طبق قانون ۳ در Agent_worklog.md)
+*.log
+logs/
+tmp/
+*.sqlite
+*.dump
+*.sql.gz
+backups/
+
+# ابزارها
+.prisma/
+.turbo/
+.eslintcache
+.DS_Store
+Thumbs.db
+
+# تولیدشدهٔ Prisma
+db/prisma/generated/
