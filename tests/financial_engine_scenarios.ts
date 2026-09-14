@@ -3,7 +3,7 @@
 //  سند بالادستی: DATA_MODEL.md بند ۱۰ و ۱۵ • PRD.md نسخه ۰.۵
 // =============================================================================
 
-import { fromDate, parseJalali } from '../lib/jalali.ts';
+import { fromDate, parseJalali } from '../lib/jalali';
 
 interface AccountDto {
   id: string;

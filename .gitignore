@@ -33,3 +33,7 @@ Thumbs.db
 
 # تولیدشدهٔ Prisma
 db/prisma/generated/
+
+# داده‌های محلی توسعه
+data/
+*.tsbuildinfo
