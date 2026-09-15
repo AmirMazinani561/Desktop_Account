@@ -14,11 +14,12 @@ export interface Account {
   path: string;
   depth: number;
   accountClass: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
-  accountKind: 'BANK' | 'CASH' | 'PERSON' | 'INCOME_HEADING' | 'EXPENSE_HEADING' | 'CONTROL' | 'OTHER';
+  accountKind: 'BANK' | 'CASH' | 'WALLET' | 'PERSON' | 'COUNTERPARTY' | 'INCOME_HEADING' | 'EXPENSE_HEADING' | 'CONTROL' | 'GENERAL' | 'OTHER';
   code: string;
   codingLevel: number;
   isPostable: boolean;
   name: string;
+  description?: string | null;
   icon: string | null;
   color: string | null;
   isFavorite: boolean;
@@ -38,6 +39,7 @@ export interface JournalLine {
   lineNo: number;
   accountId: string;
   accountName?: string;
+  accountCode?: string;
   side: 'DEBIT' | 'CREDIT';
   amount: string; // BigInt as string
   lineRole: 'SOURCE' | 'DESTINATION' | 'FEE' | 'PRINCIPAL' | 'INTEREST' | 'TAX' | 'DISCOUNT' | 'COGS' | 'MAIN';
@@ -124,9 +126,7 @@ function getDefaultStore(): DataStore {
     status: 'OPEN',
   };
 
-  // کدهای تمیز و کوتاه (شروع از ۱ برای هر دسته بندی)
   const accounts: Account[] = [
-    // صندوق اصلی (کد ۱)
     {
       id: 'acc-cash-1',
       companyId: DEFAULT_COMPANY_ID,
@@ -142,14 +142,13 @@ function getDefaultStore(): DataStore {
       icon: 'wallet',
       color: '#10B981',
       isFavorite: true,
-      openingBalance: '25000000', // ۲۵ میلیون ریال
+      openingBalance: '25000000',
       openingSide: 'DEBIT',
       isSystem: false,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // بانک ملی (کد ۲)
     {
       id: 'acc-bank-1',
       companyId: DEFAULT_COMPANY_ID,
@@ -165,14 +164,13 @@ function getDefaultStore(): DataStore {
       icon: 'landmark',
       color: '#3B82F6',
       isFavorite: true,
-      openingBalance: '150000000', // ۱۵۰ میلیون ریال
+      openingBalance: '150000000',
       openingSide: 'DEBIT',
       isSystem: false,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // شخص نمونه (کد ۳)
     {
       id: 'acc-person-1',
       companyId: DEFAULT_COMPANY_ID,
@@ -195,7 +193,6 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // حقوق و دستمزد (کد ۱۰)
     {
       id: 'acc-inc-1',
       companyId: DEFAULT_COMPANY_ID,
@@ -218,7 +215,6 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // خوراک و اقلام روزمره (کد ۲۰)
     {
       id: 'acc-exp-1',
       companyId: DEFAULT_COMPANY_ID,
@@ -241,7 +237,6 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // مسکن و شارژ (کد ۲۱)
     {
       id: 'acc-exp-2',
       companyId: DEFAULT_COMPANY_ID,
@@ -264,7 +259,6 @@ function getDefaultStore(): DataStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    // کارمزد بانکی (کد ۲۹)
     {
       id: 'acc-exp-fee',
       companyId: DEFAULT_COMPANY_ID,
@@ -299,7 +293,7 @@ function getDefaultStore(): DataStore {
   };
 }
 
-function loadStore(): DataStore {
+export function loadStore(): DataStore {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -316,7 +310,7 @@ function loadStore(): DataStore {
   return defaultStore;
 }
 
-function saveStore(store: DataStore): void {
+export function saveStore(store: DataStore): void {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -331,13 +325,12 @@ function saveStore(store: DataStore): void {
  * تولید خودکار کدهای تمیز و کوتاه (مثلاً برای بانک/صندوق: ۱، ۲، ۳... یا بر اساس نوع)
  */
 export function generateNextAccountCode(
-  accountKind: Account['accountKind'],
-  accountClass: Account['accountClass'],
+  accountKind: string,
+  accountClass: string,
   existingAccounts: Account[]
 ): string {
-  // اگر بانک یا صندوق است: کدهای عددی ۱ تا ۹
   let baseStart = 1;
-  if (accountKind === 'PERSON') baseStart = 5;
+  if (accountKind === 'PERSON' || accountKind === 'COUNTERPARTY') baseStart = 5;
   if (accountClass === 'INCOME') baseStart = 10;
   if (accountClass === 'EXPENSE') baseStart = 20;
 
@@ -354,14 +347,20 @@ export function generateNextAccountCode(
 }
 
 /**
- * محاسبه لحظه‌ای مانده هر حساب
+ * محاسبه لحظه‌ای مانده هر حساب با در نظر گرفتن مانده اول دوره و ماهیت آن
  */
 export function calculateAccountBalances(store: DataStore): Map<string, bigint> {
   const balances = new Map<string, bigint>();
 
-  // موجودی اولیه
+  // موجودی اول دوره
   for (const acc of store.accounts) {
-    const opening = BigInt(acc.openingBalance || '0');
+    const rawOpening = BigInt(acc.openingBalance || '0');
+    let opening = 0n;
+    if (acc.accountClass === 'ASSET' || acc.accountClass === 'EXPENSE') {
+      opening = acc.openingSide === 'CREDIT' ? -rawOpening : rawOpening;
+    } else {
+      opening = acc.openingSide === 'DEBIT' ? -rawOpening : rawOpening;
+    }
     balances.set(acc.id, opening);
   }
 
@@ -394,92 +393,6 @@ export function calculateAccountBalances(store: DataStore): Map<string, bigint> 
   return balances;
 }
 
-// -----------------------------------------------------------------------------
-// توابع عمومی API
-// -----------------------------------------------------------------------------
-
-export function getDashboardData() {
-  const store = loadStore();
-  const balances = calculateAccountBalances(store);
-
-  let totalCashAndBank = 0n;
-  const cashAndBankAccounts: Account[] = [];
-
-  for (const acc of store.accounts) {
-    const bal = balances.get(acc.id) || 0n;
-    acc.currentBalance = bal.toString();
-
-    if (acc.accountKind === 'CASH' || acc.accountKind === 'BANK') {
-      if (acc.isPostable) {
-        totalCashAndBank += bal;
-        cashAndBankAccounts.push(acc);
-      }
-    }
-  }
-
-  const todayDetails = fromDate(new Date());
-  let currentMonthIncome = 0n;
-  let currentMonthExpense = 0n;
-
-  for (const line of store.journalLines) {
-    const j = store.journals.find((x) => x.id === line.journalId);
-    if (!j || j.status !== 'POSTED') continue;
-
-    if (j.jalaliYear === todayDetails.jy && j.jalaliMonth === todayDetails.jm) {
-      const acc = store.accounts.find((a) => a.id === line.accountId);
-      if (!acc) continue;
-
-      if (acc.accountClass === 'INCOME' && line.side === 'CREDIT') {
-        currentMonthIncome += BigInt(line.amount);
-      } else if (acc.accountClass === 'EXPENSE' && line.side === 'DEBIT') {
-        currentMonthExpense += BigInt(line.amount);
-      }
-    }
-  }
-
-  const recentJournals = store.journals
-    .filter((j) => j.status === 'POSTED')
-    .slice(-10)
-    .reverse()
-    .map((j) => {
-      const srcLine = j.lines.find((l) => l.lineRole === 'SOURCE');
-      const dstLine = j.lines.find((l) => l.lineRole === 'DESTINATION');
-      const feeLine = j.lines.find((l) => l.lineRole === 'FEE');
-
-      const srcAcc = store.accounts.find((a) => a.id === srcLine?.accountId);
-      const dstAcc = store.accounts.find((a) => a.id === dstLine?.accountId);
-
-      return {
-        id: j.id,
-        serialNo: j.serialNo,
-        date: j.date,
-        formattedJalali: j.formattedJalali,
-        description: j.description || 'بدون شرح',
-        refNo: j.refNo,
-        amount: dstLine ? dstLine.amount : j.totalDebit,
-        fee: feeLine ? feeLine.amount : '0',
-        sourceAccountId: srcAcc?.id,
-        sourceName: srcAcc ? srcAcc.name : 'نامشخص',
-        destinationAccountId: dstAcc?.id,
-        destinationName: dstAcc ? dstAcc.name : 'نامشخص',
-        kind: j.kind,
-      };
-    });
-
-  return {
-    company: store.company,
-    todayJalali: todayDetails.formattedJalali,
-    monthName: todayDetails.monthName,
-    totalCashAndBank: totalCashAndBank.toString(),
-    currentMonthIncome: currentMonthIncome.toString(),
-    currentMonthExpense: currentMonthExpense.toString(),
-    cashAndBankAccounts,
-    recentTransactions: recentJournals,
-    accountsCount: store.accounts.filter((a) => a.isPostable).length,
-    transactionsCount: store.journals.filter((j) => j.status === 'POSTED').length,
-  };
-}
-
 export function getAllAccounts() {
   const store = loadStore();
   const balances = calculateAccountBalances(store);
@@ -490,57 +403,52 @@ export function getAllAccounts() {
   }));
 }
 
-export function createNewAccount(data: {
+export function createAccount(data: {
   name: string;
   accountClass: Account['accountClass'];
-  accountKind: Account['accountKind'];
+  accountKind?: string;
   parentId?: string | null;
-  code?: string;
-  initialBalance?: string;
+  openingBalance?: string | number;
+  openingSide?: 'DEBIT' | 'CREDIT';
+  description?: string;
   icon?: string;
   color?: string;
-  isFavorite?: boolean;
 }) {
   const store = loadStore();
 
-  const code =
-    data.code?.trim() ||
-    generateNextAccountCode(data.accountKind, data.accountClass, store.accounts);
+  const kind = (data.accountKind || 'GENERAL') as Account['accountKind'];
+  const code = generateNextAccountCode(kind, data.accountClass, store.accounts);
+  const id = `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  let color = data.color;
+  if (!color) {
+    if (data.accountClass === 'ASSET') color = '#3B82F6';
+    else if (data.accountClass === 'INCOME') color = '#10B981';
+    else if (data.accountClass === 'EXPENSE') color = '#EF4444';
+    else if (data.accountClass === 'LIABILITY') color = '#F59E0B';
+    else color = '#8B5CF6';
+  }
+
+  const cleanOpening = data.openingBalance ? Math.round(Number(String(data.openingBalance).replace(/,/g, ''))).toString() : '0';
 
   const newAccount: Account = {
-    id: `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id,
     companyId: DEFAULT_COMPANY_ID,
     parentId: data.parentId || null,
-    path: `/acc-${Date.now()}/`,
+    path: `/${id}/`,
     depth: 1,
     accountClass: data.accountClass,
-    accountKind: data.accountKind,
+    accountKind: kind,
     code,
     codingLevel: 1,
     isPostable: true,
-    name: data.name.trim(),
-    icon:
-      data.icon ||
-      (data.accountClass === 'INCOME'
-        ? 'trending-up'
-        : data.accountClass === 'EXPENSE'
-        ? 'trending-down'
-        : data.accountKind === 'PERSON'
-        ? 'user'
-        : 'wallet'),
-    color:
-      data.color ||
-      (data.accountClass === 'INCOME'
-        ? '#10B981'
-        : data.accountClass === 'EXPENSE'
-        ? '#EF4444'
-        : data.accountKind === 'PERSON'
-        ? '#8B5CF6'
-        : '#3B82F6'),
-    isFavorite: data.isFavorite !== undefined ? data.isFavorite : true,
-    openingBalance: data.initialBalance ? BigInt(Math.round(Number(data.initialBalance))).toString() : '0',
-    openingSide:
-      data.accountClass === 'ASSET' || data.accountClass === 'EXPENSE' ? 'DEBIT' : 'CREDIT',
+    name: data.name,
+    description: data.description || null,
+    icon: data.icon || 'wallet',
+    color,
+    isFavorite: false,
+    openingBalance: cleanOpening,
+    openingSide: data.openingSide || 'DEBIT',
     isSystem: false,
     isActive: true,
     createdAt: new Date().toISOString(),
@@ -557,91 +465,103 @@ export function updateAccount(
   id: string,
   data: {
     name?: string;
-    code?: string;
+    accountClass?: Account['accountClass'];
+    accountKind?: string;
+    openingBalance?: string | number;
+    openingSide?: 'DEBIT' | 'CREDIT';
+    description?: string;
     color?: string;
     icon?: string;
-    isFavorite?: boolean;
-    initialBalance?: string;
   }
 ) {
   const store = loadStore();
   const acc = store.accounts.find((a) => a.id === id);
+  if (!acc) throw new Error('حساب مورد نظر یافت نشد.');
 
-  if (!acc) throw new Error('حساب مورد نظر پیدا نشد.');
-
-  if (data.name) acc.name = data.name.trim();
-  if (data.code) acc.code = data.code.trim();
-  if (data.color) acc.color = data.color;
-  if (data.icon) acc.icon = data.icon;
-  if (data.isFavorite !== undefined) acc.isFavorite = data.isFavorite;
-  if (data.initialBalance !== undefined) {
-    acc.openingBalance = BigInt(Math.round(Number(data.initialBalance) || 0)).toString();
+  if (data.name !== undefined) acc.name = data.name.trim();
+  if (data.accountClass !== undefined) acc.accountClass = data.accountClass;
+  if (data.accountKind !== undefined) acc.accountKind = data.accountKind as Account['accountKind'];
+  if (data.openingBalance !== undefined) {
+    acc.openingBalance = Math.round(Number(String(data.openingBalance).replace(/,/g, ''))).toString();
   }
-  acc.updatedAt = new Date().toISOString();
+  if (data.openingSide !== undefined) acc.openingSide = data.openingSide;
+  if (data.description !== undefined) acc.description = data.description?.trim() || null;
+  if (data.color !== undefined) acc.color = data.color;
+  if (data.icon !== undefined) acc.icon = data.icon;
 
+  acc.updatedAt = new Date().toISOString();
   saveStore(store);
+
   return acc;
 }
 
-export function deleteAccountById(id: string) {
+export function deleteAccount(id: string) {
   const store = loadStore();
-  const accIndex = store.accounts.findIndex((a) => a.id === id);
+  const acc = store.accounts.find((a) => a.id === id);
+  if (!acc) throw new Error('حساب مورد نظر پیدا نشد.');
+  if (acc.isSystem) throw new Error('حساب‌های سیستمی قابل حذف نیستند.');
 
-  if (accIndex === -1) {
-    throw new Error('حساب مورد نظر پیدا نشد.');
+  // بررسی گردش در اسناد
+  const hasTransactions = store.journalLines.some((l) => l.accountId === id);
+  if (hasTransactions) {
+    throw new Error('این حساب دارای تراکنش و گردش مالی است و نمی‌توان آن را حذف کرد.');
   }
 
-  const acc = store.accounts[accIndex];
-  if (acc.isSystem) {
-    throw new Error('حساب‌های سیستمی قابل حذف نیستند.');
-  }
-
-  const hasActivity = store.journalLines.some((l) => l.accountId === id);
-  if (hasActivity) {
-    throw new Error('حساب دارای تراکنش و گردش مالی است و قابل حذف نیست (می‌توانید آن را غیرفعال کنید).');
-  }
-
-  store.accounts.splice(accIndex, 1);
+  store.accounts = store.accounts.filter((a) => a.id !== id);
   saveStore(store);
   return { success: true };
 }
 
 /**
- * گزارش گردش حساب (Account Ledger Statement) با ماندهٔ لحظه‌ای
+ * دریافت گزارش معین و صورت‌حساب ریزگردش با امکان فیلتر بازه تاریخی
  */
-export function getAccountLedger(accountId: string) {
+export function getAccountLedger(
+  accountId: string,
+  options?: { fromDate?: string; toDate?: string }
+) {
   const store = loadStore();
   const acc = store.accounts.find((a) => a.id === accountId);
-  if (!acc) throw new Error('حساب پیدا نشد.');
+  if (!acc) throw new Error('حساب مورد نظر پیدا نشد.');
 
-  const openingBal = BigInt(acc.openingBalance || '0');
-  let running = openingBal;
-
-  const entries: any[] = [];
-
-  // ورودی موجودی اولیه
-  if (openingBal > 0n) {
-    entries.push({
-      id: 'opening',
-      serialNo: '—',
-      date: 'افتتاحیه',
-      formattedJalali: 'موجودی اولیه',
-      description: 'موجودی اولیه حساب',
-      counterAccountName: 'سند افتتاحیه',
-      debit: acc.openingSide === 'DEBIT' ? openingBal.toString() : '0',
-      credit: acc.openingSide === 'CREDIT' ? openingBal.toString() : '0',
-      runningBalance: running.toString(),
-      refNo: null,
-    });
+  const rawOpening = BigInt(acc.openingBalance || '0');
+  let initialOpening = 0n;
+  if (acc.accountClass === 'ASSET' || acc.accountClass === 'EXPENSE') {
+    initialOpening = acc.openingSide === 'CREDIT' ? -rawOpening : rawOpening;
+  } else {
+    initialOpening = acc.openingSide === 'DEBIT' ? -rawOpening : rawOpening;
   }
 
-  // گردش خطوط
-  for (const line of store.journalLines) {
-    if (line.accountId !== accountId) continue;
-    const j = store.journals.find((x) => x.id === line.journalId);
-    if (!j || j.status !== 'POSTED') continue;
+  // سورت تمام خطوط اسناد ثبت‌شده بر اساس تاریخ و شماره سند
+  const postedJournalsMap = new Map<string, Journal>();
+  for (const j of store.journals) {
+    if (j.status === 'POSTED') postedJournalsMap.set(j.id, j);
+  }
 
+  // خطوط متعلق به این حساب
+  const allLines = store.journalLines
+    .filter((l) => l.accountId === accountId && postedJournalsMap.has(l.journalId))
+    .sort((a, b) => {
+      const jA = postedJournalsMap.get(a.journalId)!;
+      const jB = postedJournalsMap.get(b.journalId)!;
+      const dComp = jA.formattedJalali.localeCompare(jB.formattedJalali);
+      if (dComp !== 0) return dComp;
+      return Number(jA.serialNo) - Number(jB.serialNo);
+    });
+
+  let running = 0n;
+  const entries: any[] = [];
+
+  // خط مانده اولیه کلی
+  if (rawOpening > 0n) {
+    running += initialOpening;
+  }
+
+  for (const line of allLines) {
+    const j = postedJournalsMap.get(line.journalId)!;
     const amount = BigInt(line.amount);
+
+    const isInRange = (!options?.fromDate || j.formattedJalali >= options.fromDate) &&
+                      (!options?.toDate || j.formattedJalali <= options.toDate);
 
     if (acc.accountClass === 'ASSET' || acc.accountClass === 'EXPENSE') {
       if (line.side === 'DEBIT') running += amount;
@@ -651,23 +571,26 @@ export function getAccountLedger(accountId: string) {
       else running -= amount;
     }
 
-    // پیدا کردن حساب مقابل
-    const otherLine = j.lines.find((l) => l.id !== line.id && l.lineRole !== 'FEE');
-    const otherAcc = store.accounts.find((a) => a.id === otherLine?.accountId);
+    if (isInRange) {
+      // پیدا کردن حساب مقابل
+      const otherLine = j.lines.find((l) => l.id !== line.id && l.lineRole !== 'FEE');
+      const otherAcc = store.accounts.find((a) => a.id === otherLine?.accountId);
 
-    entries.push({
-      id: line.id,
-      journalId: j.id,
-      serialNo: j.serialNo,
-      date: j.date,
-      formattedJalali: j.formattedJalali,
-      description: line.description || j.description || 'بدون شرح',
-      counterAccountName: otherAcc ? otherAcc.name : 'سایر حساب‌ها',
-      debit: line.side === 'DEBIT' ? amount.toString() : '0',
-      credit: line.side === 'CREDIT' ? amount.toString() : '0',
-      runningBalance: running.toString(),
-      refNo: j.refNo,
-    });
+      entries.push({
+        id: line.id,
+        journalId: j.id,
+        serialNo: j.serialNo,
+        date: j.date,
+        formattedJalali: j.formattedJalali,
+        description: line.description || j.description || 'بدون شرح',
+        counterAccountName: otherAcc ? otherAcc.name : 'سایر حساب‌ها',
+        debit: line.side === 'DEBIT' ? amount.toString() : '0',
+        credit: line.side === 'CREDIT' ? amount.toString() : '0',
+        runningBalance: running.toString(),
+        refNo: j.refNo,
+        status: j.status,
+      });
+    }
   }
 
   return {
@@ -675,6 +598,8 @@ export function getAccountLedger(accountId: string) {
       ...acc,
       currentBalance: running.toString(),
     },
+    openingBalance: rawOpening.toString(),
+    openingSide: acc.openingSide,
     entries,
     totalDebit: entries.reduce((s, e) => s + BigInt(e.debit || 0), 0n).toString(),
     totalCredit: entries.reduce((s, e) => s + BigInt(e.credit || 0), 0n).toString(),
@@ -700,12 +625,12 @@ export function createTransaction(data: {
     throw new Error('حساب مبدأ یا مقصد نامعتبر است.');
   }
 
-  const amountBig = BigInt(Math.round(Number(data.amount)));
+  const amountBig = BigInt(Math.round(Number(String(data.amount).replace(/,/g, ''))));
   if (amountBig <= 0n) {
     throw new Error('مبلغ تراکنش باید بزرگ‌تر از صفر باشد.');
   }
 
-  const feeBig = data.fee ? BigInt(Math.round(Number(data.fee))) : 0n;
+  const feeBig = data.fee ? BigInt(Math.round(Number(String(data.fee).replace(/,/g, '')))) : 0n;
 
   let dateDetails;
   if (data.shamsiDate) {
@@ -725,7 +650,7 @@ export function createTransaction(data: {
   const journalId = `j-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   const lines: JournalLine[] = [];
 
-  // سطر ۱: بستانکار مبدأ
+  // سطر ۱: بستانکار مبدأ (کل وجه پرداختی شامل اصل مبلغ + کارمزد)
   lines.push({
     id: `jl-${Date.now()}-1`,
     journalId,
@@ -733,6 +658,7 @@ export function createTransaction(data: {
     lineNo: 1,
     accountId: srcAcc.id,
     accountName: srcAcc.name,
+    accountCode: srcAcc.code,
     side: 'CREDIT',
     amount: (amountBig + feeBig).toString(),
     lineRole: 'SOURCE',
@@ -742,7 +668,7 @@ export function createTransaction(data: {
     jalaliMonth: dateDetails.jm,
   });
 
-  // سطر ۲: بدهکار مقصد
+  // سطر ۲: بدهکار مقصد (اصل مبلغ)
   lines.push({
     id: `jl-${Date.now()}-2`,
     journalId,
@@ -750,6 +676,7 @@ export function createTransaction(data: {
     lineNo: 2,
     accountId: dstAcc.id,
     accountName: dstAcc.name,
+    accountCode: dstAcc.code,
     side: 'DEBIT',
     amount: amountBig.toString(),
     lineRole: 'DESTINATION',
@@ -771,6 +698,7 @@ export function createTransaction(data: {
       lineNo: 3,
       accountId: feeAcc.id,
       accountName: feeAcc.name,
+      accountCode: feeAcc.code,
       side: 'DEBIT',
       amount: feeBig.toString(),
       lineRole: 'FEE',
@@ -839,9 +767,9 @@ export function updateTransaction(
   const dstAcc = store.accounts.find((a) => a.id === data.destinationAccountId);
   if (!srcAcc || !dstAcc) throw new Error('حساب مبدأ یا مقصد نامعتبر است.');
 
-  const amountBig = BigInt(Math.round(Number(data.amount)));
+  const amountBig = BigInt(Math.round(Number(String(data.amount).replace(/,/g, ''))));
   if (amountBig <= 0n) throw new Error('مبلغ باید بزرگ‌تر از صفر باشد.');
-  const feeBig = data.fee ? BigInt(Math.round(Number(data.fee))) : 0n;
+  const feeBig = data.fee ? BigInt(Math.round(Number(String(data.fee).replace(/,/g, '')))) : 0n;
 
   let dateDetails;
   if (data.shamsiDate) {
@@ -866,6 +794,7 @@ export function updateTransaction(
     lineNo: 1,
     accountId: srcAcc.id,
     accountName: srcAcc.name,
+    accountCode: srcAcc.code,
     side: 'CREDIT',
     amount: (amountBig + feeBig).toString(),
     lineRole: 'SOURCE',
@@ -882,6 +811,7 @@ export function updateTransaction(
     lineNo: 2,
     accountId: dstAcc.id,
     accountName: dstAcc.name,
+    accountCode: dstAcc.code,
     side: 'DEBIT',
     amount: amountBig.toString(),
     lineRole: 'DESTINATION',
@@ -901,6 +831,7 @@ export function updateTransaction(
       lineNo: 3,
       accountId: feeAcc.id,
       accountName: feeAcc.name,
+      accountCode: feeAcc.code,
       side: 'DEBIT',
       amount: feeBig.toString(),
       lineRole: 'FEE',
@@ -958,4 +889,82 @@ export function getAllJournals() {
       };
     }),
   }));
+}
+
+export function getDashboardData() {
+  const store = loadStore();
+  const balances = calculateAccountBalances(store);
+  const today = fromDate(new Date());
+
+  // محاسبه موجودی کل نقد و بانک
+  let totalCashAndBank = 0n;
+  const cashAndBankAccounts: any[] = [];
+
+  for (const acc of store.accounts) {
+    if (acc.accountKind === 'CASH' || acc.accountKind === 'BANK' || acc.accountKind === 'WALLET') {
+      const bal = balances.get(acc.id) || 0n;
+      totalCashAndBank += bal;
+      cashAndBankAccounts.push({
+        ...acc,
+        currentBalance: bal.toString(),
+      });
+    }
+  }
+
+  // درآمد و هزینه ماه جاری
+  let currentMonthIncome = 0n;
+  let currentMonthExpense = 0n;
+
+  for (const line of store.journalLines) {
+    const j = store.journals.find((x) => x.id === line.journalId);
+    if (!j || j.status !== 'POSTED') continue;
+    if (line.jalaliYear === today.jy && line.jalaliMonth === today.jm) {
+      const acc = store.accounts.find((a) => a.id === line.accountId);
+      if (acc?.accountClass === 'INCOME' && line.side === 'CREDIT') {
+        currentMonthIncome += BigInt(line.amount);
+      }
+      if (acc?.accountClass === 'EXPENSE' && line.side === 'DEBIT') {
+        currentMonthExpense += BigInt(line.amount);
+      }
+    }
+  }
+
+  // ۵ تراکنش اخیر
+  const recentTransactions = store.journals
+    .filter((j) => j.status === 'POSTED')
+    .slice(-5)
+    .reverse()
+    .map((j) => {
+      const srcLine = j.lines.find((l) => l.lineRole === 'SOURCE');
+      const dstLine = j.lines.find((l) => l.lineRole === 'DESTINATION');
+      const feeLine = j.lines.find((l) => l.lineRole === 'FEE');
+
+      const srcAcc = store.accounts.find((a) => a.id === srcLine?.accountId);
+      const dstAcc = store.accounts.find((a) => a.id === dstLine?.accountId);
+
+      return {
+        id: j.id,
+        serialNo: j.serialNo,
+        formattedJalali: j.formattedJalali,
+        description: j.description || 'تراکنش مالی',
+        sourceName: srcAcc ? srcAcc.name : 'نامشخص',
+        destinationName: dstAcc ? dstAcc.name : 'نامشخص',
+        amount: dstLine ? dstLine.amount : j.totalDebit,
+        fee: feeLine ? feeLine.amount : '0',
+        refNo: j.refNo,
+      };
+    });
+
+  return {
+    company: store.company,
+    todayJalali: today.formattedJalali,
+    monthName: today.monthName,
+    totalCashAndBank: totalCashAndBank.toString(),
+    currentMonthIncome: currentMonthIncome.toString(),
+    currentMonthExpense: currentMonthExpense.toString(),
+    cashAndBankAccounts,
+    recentTransactions,
+    accountsCount: store.accounts.length,
+    transactionsCount: store.journals.filter((j) => j.status === 'POSTED').length,
+  };
 }

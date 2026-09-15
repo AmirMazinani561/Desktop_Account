@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteAccountById, updateAccount } from '@/db/repo';
+import { deleteAccount, updateAccount } from '@/db/repo';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const res = deleteAccountById(id);
+    const res = deleteAccount(id);
     return NextResponse.json(res);
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطای حذف حساب' }, { status: 400 });

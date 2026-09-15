@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRightLeft, TrendingDown, TrendingUp, DollarSign, FileText, Hash, Sparkles } from 'lucide-react';
+import { X, ArrowRightLeft, TrendingDown, TrendingUp, FileText, Hash } from 'lucide-react';
 import { formatRial } from '@/lib/formatters';
 import { AccountOption } from '@/types';
 import ShamsiDatePicker from '@/components/ShamsiDatePicker';
+import AccountSelect from '@/components/AccountSelect';
 
 export default function TransactionModal({
   isOpen,
@@ -34,6 +35,18 @@ export default function TransactionModal({
 
   const isEditMode = !!editData;
 
+  // قفل کردن اسکرول صفحه پس‌زمینه هنگام باز بودن مودال
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     if (editData) {
       setSourceId(editData.sourceAccountId || '');
@@ -45,22 +58,20 @@ export default function TransactionModal({
       setRefNo(editData.refNo || '');
     } else {
       if (todayJalali) setShamsiDate(todayJalali);
-      // انتخاب پیش‌فرض هوشمند
       const postable = accounts.filter((a) => a.isPostable);
-      const cashAndBank = postable.filter((a) => a.accountKind === 'CASH' || a.accountKind === 'BANK');
+      const cashAndBank = postable.filter((a) => a.accountKind === 'CASH' || a.accountKind === 'BANK' || a.accountKind === 'WALLET');
       const expenses = postable.filter((a) => a.accountClass === 'EXPENSE');
       const incomes = postable.filter((a) => a.accountClass === 'INCOME');
 
       if (type === 'EXPENSE') {
-        if (cashAndBank.length > 0) setSourceId(cashAndBank[0].id);
-        if (expenses.length > 0) setDestId(expenses[0].id);
+        if (cashAndBank.length > 0 && !sourceId) setSourceId(cashAndBank[0].id);
+        if (expenses.length > 0 && !destId) setDestId(expenses[0].id);
       } else if (type === 'INCOME') {
-        if (incomes.length > 0) setSourceId(incomes[0].id);
-        if (cashAndBank.length > 0) setDestId(cashAndBank[0].id);
+        if (incomes.length > 0 && !sourceId) setSourceId(incomes[0].id);
+        if (cashAndBank.length > 0 && !destId) setDestId(cashAndBank[0].id);
       } else {
-        if (cashAndBank.length > 0) setSourceId(cashAndBank[0].id);
-        if (cashAndBank.length > 1) setDestId(cashAndBank[1].id);
-        else if (postable.length > 0) setDestId(postable[0].id);
+        if (cashAndBank.length > 0 && !sourceId) setSourceId(cashAndBank[0].id);
+        if (cashAndBank.length > 1 && !destId) setDestId(cashAndBank[1].id);
       }
     }
   }, [editData, type, accounts, todayJalali, isOpen]);
@@ -123,28 +134,30 @@ export default function TransactionModal({
     }
   };
 
-  const postableAccounts = accounts.filter((a) => a.isPostable);
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-100 my-auto animate-in fade-in zoom-in-95 duration-150">
         {/* سربرگ */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70 rounded-t-2xl">
           <h2 className="font-bold text-slate-800 text-sm">
             {isEditMode ? `ویرایش تراکنش (سند شماره ${editData.serialNo})` : 'ثبت تراکنش جدید'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* انتخاب نوع تراکنش (در حالت ثبت جدید) */}
+        {/* انتخاب نوع تراکنش */}
         {!isEditMode && (
           <div className="px-6 pt-4">
             <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1.5 rounded-xl text-xs font-medium">
               <button
                 type="button"
-                onClick={() => setType('EXPENSE')}
+                onClick={() => {
+                  setType('EXPENSE');
+                  setSourceId('');
+                  setDestId('');
+                }}
                 className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
                   type === 'EXPENSE' ? 'bg-rose-500 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
                 }`}
@@ -154,7 +167,11 @@ export default function TransactionModal({
               </button>
               <button
                 type="button"
-                onClick={() => setType('INCOME')}
+                onClick={() => {
+                  setType('INCOME');
+                  setSourceId('');
+                  setDestId('');
+                }}
                 className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
                   type === 'INCOME' ? 'bg-emerald-600 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
                 }`}
@@ -164,13 +181,17 @@ export default function TransactionModal({
               </button>
               <button
                 type="button"
-                onClick={() => setType('TRANSFER')}
+                onClick={() => {
+                  setType('TRANSFER');
+                  setSourceId('');
+                  setDestId('');
+                }}
                 className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition cursor-pointer ${
                   type === 'TRANSFER' ? 'bg-blue-600 text-white shadow-xs font-semibold' : 'text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 <ArrowRightLeft className="w-4 h-4" />
-                <span>انتقال / کارت‌به‌کارت</span>
+                <span>انتقال / جابجایی</span>
               </button>
             </div>
           </div>
@@ -184,48 +205,29 @@ export default function TransactionModal({
             </div>
           )}
 
-          {/* حساب مبدأ و مقصد */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                {type === 'INCOME' ? 'سرفصل درآمد (مبدأ)' : 'پرداخت از (مبدأ)'}
-              </label>
-              <select
-                value={sourceId}
-                onChange={(e) => setSourceId(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-              >
-                {postableAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} (کد: {a.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                {type === 'EXPENSE' ? 'بابت سرفصل (مقصد)' : 'واریز به (مقصد)'}
-              </label>
-              <select
-                value={destId}
-                onChange={(e) => setDestId(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-              >
-                {postableAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} (کد: {a.code})
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* حساب مبدأ و مقصد با سرچ داینامیک */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <AccountSelect
+              accounts={accounts}
+              value={sourceId}
+              onChange={setSourceId}
+              label={type === 'INCOME' ? 'سرفصل درآمد (مبدأ)' : 'پرداخت از (مبدأ)'}
+              placeholder="جستجوی حساب مبدأ..."
+            />
+            <AccountSelect
+              accounts={accounts}
+              value={destId}
+              onChange={setDestId}
+              label={type === 'EXPENSE' ? 'بابت سرفصل (مقصد)' : 'واریز به (مقصد)'}
+              placeholder="جستجوی حساب مقصد..."
+            />
           </div>
 
-          {/* مبلغ و کارمزد (یکدست و استاندارد) */}
+          {/* مبلغ و کارمزد بدون علامت $ با فونت تمیز فارسی */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5 flex items-center justify-between">
-                <span>مبلغ (ریال) *</span>
+                <span>مبلغ *</span>
                 {amount && (
                   <span className="text-emerald-600 text-2xs font-semibold font-mono">
                     {formatRial(amount.replace(/\D/g, ''))}
@@ -240,12 +242,14 @@ export default function TransactionModal({
                     const raw = e.target.value.replace(/\D/g, '');
                     setAmount(raw ? Number(raw).toLocaleString('en-US') : '');
                   }}
-                  placeholder="مثال: ۵٬۰۰۰٬۰۰۰"
-                  className="w-full text-sm font-semibold tracking-wide bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-mono"
+                  placeholder="مثال: ۵,۰۰۰,۰۰۰"
+                  className="w-full text-sm font-bold tracking-wide bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-11 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-mono"
                   dir="ltr"
                   required
                 />
-                <DollarSign className="w-4 h-4 text-slate-400 absolute right-2.5 top-3" />
+                <span className="absolute right-3 top-3 text-2xs font-semibold text-slate-500 select-none">
+                  ریال
+                </span>
               </div>
             </div>
 
@@ -266,11 +270,13 @@ export default function TransactionModal({
                     const raw = e.target.value.replace(/\D/g, '');
                     setFee(raw ? Number(raw).toLocaleString('en-US') : '');
                   }}
-                  placeholder="مثال: ۱۰٬۰۰۰"
-                  className="w-full text-sm font-semibold tracking-wide bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-mono"
+                  placeholder="مثال: ۱۰,۰۰۰"
+                  className="w-full text-sm font-bold tracking-wide bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-11 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-mono"
                   dir="ltr"
                 />
-                <DollarSign className="w-4 h-4 text-slate-400 absolute right-2.5 top-3" />
+                <span className="absolute right-3 top-3 text-2xs font-semibold text-slate-500 select-none">
+                  ریال
+                </span>
               </div>
             </div>
           </div>
@@ -281,7 +287,7 @@ export default function TransactionModal({
               <ShamsiDatePicker
                 value={shamsiDate}
                 onChange={(d) => setShamsiDate(d)}
-                label="تاریخ شمسی (انتخابی)"
+                label="تاریخ شمسی"
               />
             </div>
 
@@ -301,7 +307,7 @@ export default function TransactionModal({
             </div>
           </div>
 
-          {/* شرح سند */}
+          {/* شرح تراکنش */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">شرح تراکنش</label>
             <div className="relative">
@@ -309,7 +315,7 @@ export default function TransactionModal({
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="توضیحات درباره این تراکنش..."
+                placeholder="توضیحات و بابت این تراکنش..."
                 className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               />
               <FileText className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" />

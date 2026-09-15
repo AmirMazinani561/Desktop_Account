@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllAccounts, createNewAccount } from '@/db/repo';
+import { getAllAccounts, createAccount } from '@/db/repo';
 
 export async function GET() {
   try {
@@ -13,10 +13,18 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    if (!body.name || !body.accountClass || !body.accountKind) {
-      return NextResponse.json({ error: 'نام، گروه و نوع حساب الزامی است.' }, { status: 400 });
+    if (!body.name || !body.accountClass) {
+      return NextResponse.json({ error: 'نام و طبقه حساب الزامی است.' }, { status: 400 });
     }
-    const acc = createNewAccount(body);
+    const acc = createAccount({
+      name: body.name,
+      accountClass: body.accountClass,
+      accountKind: body.accountKind || 'GENERAL',
+      parentId: body.parentId || null,
+      openingBalance: body.openingBalance || '0',
+      openingSide: body.openingSide || 'DEBIT',
+      description: body.description || '',
+    });
     return NextResponse.json(acc, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطای ثبت حساب' }, { status: 400 });
