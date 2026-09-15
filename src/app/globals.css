@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Vazirmatn', 'Vazir', 'Shabnam', 'Sahel', 'Tahoma', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --font-mono: 'Vazirmatn', 'Vazir', 'Courier New', monospace;
+}
+
+@layer base {
+  *, ::before, ::after {
+    font-family: var(--font-sans);
+  }
+  
+  html {
+    direction: rtl;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  input, button, select, textarea, table, th, td {
+    font-family: inherit;
+  }
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* اسکرول بار نرم */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
