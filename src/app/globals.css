@@ -1,18 +1,17 @@
-@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: 'Vazirmatn', 'Vazir', 'Shabnam', 'Sahel', 'Tahoma', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --font-mono: 'Vazirmatn', 'Vazir', 'Courier New', monospace;
 }
 
 @layer base {
   *, ::before, ::after {
-    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-family: var(--font-sans);
   }
   
   html {
     direction: rtl;
-    font-feature-settings: "ss01", "ss02", "cv01";
   }
 
   body {
@@ -23,13 +22,12 @@
   }
 
   input, button, select, textarea, table, th, td {
-    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-family: inherit;
   }
 }
 
-/* اعداد فارسی در مبالغ و فونت یکدست */
 .font-mono {
-  font-family: 'Vazirmatn', monospace, sans-serif !important;
+  font-family: var(--font-mono);
 }
 
 /* اسکرول بار نرم */
